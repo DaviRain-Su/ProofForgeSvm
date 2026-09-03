@@ -2,6 +2,7 @@ import Lean
 import ProofForge.Extract.Ops
 import ProofForge.Profile
 import ProofForge.Attr
+import ProofForge.Svm.Attr
 import ProofForge.Core.Value
 import ProofForge.Svm.Runtime
 import ProofForge.Extract.Lexical

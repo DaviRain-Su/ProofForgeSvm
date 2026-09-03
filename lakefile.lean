@@ -11,17 +11,10 @@ require solanalib from git
 require sbpfSemantics from git
   "https://github.com/DaviRain-Su/assembler-semantics.git" @ "64770b7a68c735f5ff6eea73f0d322daf34d7cad"
 
-/-- Shared Attr + Core/Crypto surface used by the SVM SDK. -/
-lean_lib ProofForgeCore where
-  roots := #[
-    `ProofForge.Attr,
-    `ProofForge.Core.Codec,
-    `ProofForge.Core.Collections,
-    `ProofForge.Core.Math,
-    `ProofForge.Core.Ops,
-    `ProofForge.Core.SafeCast,
-    `ProofForge.Core.Value
-  ]
+/-- Shared Attr + Core/Crypto surface, now maintained in ProofForgeCommon.
+    `ProofForge.Svm.Attr` (below) extends the shared attributes with the SVM
+    packed wire-entry adapters. -/
+require «proofforge-common» from "../ProofForgeCommon"
 
 /-- Contract-facing SVM SDK (+ Runtime/Source needed for `pf_inline` erase). No Emit. -/
 lean_lib ProofForgeSvmSdk where
@@ -65,78 +58,19 @@ lean_lib ProofForgeSvmSdk where
     `ProofForge.Svm.TransientVec
   ]
 
-/-- Compiler: Extract, Svm IR/Emit/Assemble/Registry, and the `ProofForge` umbrella. -/
+/-- Compiler: Extract, Svm IR/Emit/Assemble/Registry, and the `ProofForge` umbrella.
+    The lib is named `ProofForgeSvm` (not `ProofForge`): a lean_lib name claims its
+    namespace for this package and would shadow the `ProofForge.Core.*` /
+    `ProofForge.Crypto.*` modules exported by `proofforge-common`. -/
 @[default_target]
-lean_lib ProofForge where
-  roots := #[
-    `ProofForge,
-    `ProofForge.Cli,
-    `ProofForge.Core.CFG,
-    `ProofForge.Core.Eval,
-    `ProofForge.Core.FixedPoint,
-    `ProofForge.Core.IR,
-    `ProofForge.Core.Schema,
-    `ProofForge.Core.Target,
-    `ProofForge.Crypto.Keccak,
-    `ProofForge.Crypto.Sha256,
-    `ProofForge.Crypto.Sha256Compat,
-    `ProofForge.Extract,
-    `ProofForge.Extract.Compat,
-    `ProofForge.Extract.Decode,
-    `ProofForge.Extract.IR,
-    `ProofForge.Extract.LegacyAdapter,
-    `ProofForge.Extract.LegacyEval,
-    `ProofForge.Extract.LegacyGolden,
-    `ProofForge.Extract.LegacyIR,
-    `ProofForge.Extract.LegacyOps,
-    `ProofForge.Extract.Lexical,
-    `ProofForge.Extract.Ops,
-    `ProofForge.Profile,
-    `ProofForge.Svm.ABI,
-    `ProofForge.Svm.ABICompat,
-    `ProofForge.Svm.AccountData,
-    `ProofForge.Svm.AccountData.Emit,
-    `ProofForge.Svm.AccountStorage.Emit,
-    `ProofForge.Svm.AccountView.Emit,
-    `ProofForge.Svm.Assemble,
-    `ProofForge.Svm.AssembleCompat,
-    `ProofForge.Svm.AssembleMain,
-    `ProofForge.Svm.BatchRecorder,
-    `ProofForge.Svm.BatchRecorder.Emit,
-    `ProofForge.Svm.BatchRecorder.Source,
-    `ProofForge.Svm.Commands,
-    `ProofForge.Svm.Component,
-    `ProofForge.Svm.Component.Emit,
-    `ProofForge.Svm.Cpi.Emit,
-    `ProofForge.Svm.Cpi.TokenTlv.Emit,
-    `ProofForge.Svm.Emit,
-    `ProofForge.Svm.EmitCompat,
-    `ProofForge.Svm.EntryAdapter,
-    `ProofForge.Svm.EntryAdapter.Emit,
-    `ProofForge.Svm.FifoCancel,
-    `ProofForge.Svm.FifoCancel.Emit,
-    `ProofForge.Svm.FifoCancel.Source,
-    `ProofForge.Svm.Heap.Emit,
-    `ProofForge.Svm.IR,
-    `ProofForge.Svm.IRCompat,
-    `ProofForge.Svm.Idl,
-    `ProofForge.Svm.IdlCompat,
-    `ProofForge.Svm.Lamports,
-    `ProofForge.Svm.Lamports.Emit,
-    `ProofForge.Svm.Memory.Emit,
-    `ProofForge.Svm.Ops,
-    `ProofForge.Svm.Registry,
-    `ProofForge.Svm.Sdk.StorageModel,
-    `ProofForge.Svm.Semantics,
-    `ProofForge.Svm.SemanticsBridge,
-    `ProofForge.Svm.Solanalib,
-    `ProofForge.Svm.SolanalibSkipChain,
-    `ProofForge.Svm.Sysvar,
-    `ProofForge.Svm.Sysvar.Emit,
-    `ProofForge.Svm.Telemetry.Emit,
-    `ProofForge.Svm.Transient.Emit,
-    `ProofForge.Svm.TransientBytes.Emit,
-    `ProofForge.Svm.TransientVec.Emit
+lean_lib ProofForgeSvm where
+  globs := #[
+    .one `ProofForge,
+    .one `ProofForge.Cli,
+    .one `ProofForge.Svm.Attr,
+    .submodules `ProofForge.Svm,
+    .one `ProofForge.Extract,
+    .submodules `ProofForge.Extract
   ]
 
 /-- Build every module under `Examples/` (SVM fixtures only). -/
