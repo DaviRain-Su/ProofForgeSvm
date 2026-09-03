@@ -103,6 +103,7 @@ import Tests.SvmSdkPubkeySpec
 import Tests.TokenShapeSpec
 import Tests.SvmReturnDataSpec
 import Tests.SvmToken2022ExtSpec
+import Tests.SvmToken2022TfeeSpec
 import Tests.SvmHashWordsSpec
 import Tests.ProofSpec
 import Tests.SemanticsSpec

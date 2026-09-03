@@ -112,13 +112,58 @@ private def emitMintCloseTlv (err next endCheck afterClose : String) : String :=
 "
 
 /--
-Zero-byte marker specialization: accept the given extension type with a zero body once, then
-require end (or no further bytes). Shared by ImmutableOwner/NonTransferable marker policies.
+Transfer-fee specialization: accept type=1 (`TransferFeeConfig`) with the full official
+108-byte body once, then require end (or no further bytes). Same header discipline as the
+other one-entry specializations.
 -/
-private def emitMarkerTlv (err next endCheck afterClose : String) (markerType : Nat) : String :=
-  let afterHeader := tlvStart + 4
+private def emitTransferFeeTlv (err next endCheck afterClose : String) : String :=
+  let afterBody := tlvStart + 4 + transferFeeBodyLen.toNat
   s!"\
-  ; marker TLV: allow type={markerType} with zero body once, then end, or end alone
+  ; transfer-fee TLV: allow TransferFeeConfig(1,{transferFeeBodyLen.toNat}) then end, or end alone
+  mov64 r4, r2
+  sub64 r4, {tlvStart}
+  jeq r4, 0, {next}
+  jeq r4, 1, {next}
+  ldxb r5, [r3 + {tlvStart}]
+  ldxb r6, [r3 + {tlvStart + 1}]
+  jne r6, 0, {err}
+  jeq r5, 0, {endCheck}
+  jne r5, {transferFeeConfigType.toNat}, {err}
+  ; need full header + {transferFeeBodyLen.toNat}-byte body
+  jlt r4, {4 + transferFeeBodyLen.toNat}, {err}
+  ldxb r5, [r3 + {tlvStart + 2}]
+  jne r5, {transferFeeBodyLen.toNat}, {err}
+  ldxb r5, [r3 + {tlvStart + 3}]
+  jne r5, 0, {err}
+  ; after body: require end/padding
+  mov64 r4, r2
+  sub64 r4, {afterBody}
+  jeq r4, 0, {next}
+  jeq r4, 1, {next}
+  ldxb r5, [r3 + {afterBody}]
+  jne r5, 0, {err}
+  ldxb r5, [r3 + {afterBody + 1}]
+  jne r5, 0, {err}
+  ja {next}
+{endCheck}:
+  jgt r4, 3, {afterClose}
+  ja {next}
+{afterClose}:
+  jne r6, 0, {err}
+  ja {next}
+"
+
+/--
+Body-length marker specialization: accept the given extension type with the given body length
+once, then require end (or no further bytes). Shared by zero-byte markers
+(ImmutableOwner/NonTransferable) and the 8-byte `TransferFeeAmount`.
+-/
+private def emitMarkerTlv (err next endCheck afterClose : String) (markerType : Nat)
+    (bodyLen : Nat := 0) : String :=
+  let afterHeader := tlvStart + 4
+  let afterBody := afterHeader + bodyLen
+  s!"\
+  ; marker TLV: allow type={markerType} with {bodyLen}-byte body once, then end, or end alone
   mov64 r4, r2
   sub64 r4, {tlvStart}
   jeq r4, 0, {next}
@@ -128,19 +173,19 @@ private def emitMarkerTlv (err next endCheck afterClose : String) (markerType : 
   jne r6, 0, {err}
   jeq r5, 0, {endCheck}
   jne r5, {markerType}, {err}
-  ; zero-byte body: length field must be 0
+  ; body length field must be {bodyLen}
   ldxb r5, [r3 + {tlvStart + 2}]
-  jne r5, 0, {err}
+  jne r5, {bodyLen}, {err}
   ldxb r5, [r3 + {tlvStart + 3}]
   jne r5, 0, {err}
-  ; after header: require end/padding
+  ; after body: require end/padding
   mov64 r4, r2
-  sub64 r4, {afterHeader}
+  sub64 r4, {afterBody}
   jeq r4, 0, {next}
   jeq r4, 1, {next}
-  ldxb r5, [r3 + {afterHeader}]
+  ldxb r5, [r3 + {afterBody}]
   jne r5, 0, {err}
-  ldxb r5, [r3 + {afterHeader + 1}]
+  ldxb r5, [r3 + {afterBody + 1}]
   jne r5, 0, {err}
   ja {next}
 {endCheck}:
@@ -201,6 +246,20 @@ def emitPreflight (ctx : Context) (label : String) (physical : Nat) (policy : Po
     return s!"\
   ; token-2022 TLV non-transferable-mint policy for physical account {physical}
 {base}{emitMarkerTlv err next endCheck afterClose (UInt64.toNat nonTransferableType)}{next}:
+"
+  | .token2022TransferFeeConfigMint =>
+    let endCheck := s!"cpi_data_len_ok_{label}_p{physical}_end"
+    let afterClose := s!"cpi_data_len_ok_{label}_p{physical}_after_close"
+    return s!"\
+  ; token-2022 TLV transfer-fee-mint policy for physical account {physical}
+{base}{emitTransferFeeTlv err next endCheck afterClose}{next}:
+"
+  | .token2022TransferFeeAmountAccount =>
+    let endCheck := s!"cpi_data_len_ok_{label}_p{physical}_end"
+    let afterClose := s!"cpi_data_len_ok_{label}_p{physical}_after_close"
+    return s!"\
+  ; token-2022 TLV transfer-fee-amount policy for physical account {physical}
+{base}{emitMarkerTlv err next endCheck afterClose (UInt64.toNat transferFeeAmountType) (UInt64.toNat transferFeeAmountBodyLen)}{next}:
 "
 
 end ProofForge.Svm.Cpi.TokenTlv.Emit

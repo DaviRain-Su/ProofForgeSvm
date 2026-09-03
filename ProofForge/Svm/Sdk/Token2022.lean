@@ -53,6 +53,15 @@ owns the on-chain rejection. The new owner is the public key of external account
 @[pf_inline] def setAccountAuthorityImmutable : UInt64 :=
   ProofForge.Svm.Runtime.token2022SetAccountAuthorityImmutable
 
+/--
+Token-2022 `TransferChecked` over a transfer-fee mint: the mint must carry exactly one official
+`TransferFeeConfig` entry; source/destination stay on the closed base policy. The token program
+charges the fee over the CPI boundary; this facade only guards admission.
+-/
+@[pf_inline] def transferCheckedTransferFee (amount decimals : UInt64) : UInt64 :=
+  ProofForge.Svm.Runtime.token2022TransferCheckedTransferFee amount decimals
+
+
 /-- Host-side view of a successfully parsed mint-close authority pubkey (32 raw bytes). -/
 structure MintCloseAuthority where
   bytes : Array UInt8

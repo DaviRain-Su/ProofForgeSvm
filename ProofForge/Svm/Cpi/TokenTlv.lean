@@ -72,6 +72,22 @@ def headerBytes : Nat := 4
 /-- `AccountType::Uninitialized` = `ExtensionType::Uninitialized` (ordinal 0). -/
 def uninitializedType : UInt64 := 0
 
+/-- Official `ExtensionType::TransferFeeConfig` ordinal (mint-side). -/
+def transferFeeConfigType : UInt64 := 1
+
+/--
+Official `TransferFeeConfig` body length: two `MaybeNull<Address>` authorities (32 + 32),
+withheld amount (8), and two `TransferFee` records (18 each: epoch u64 + maximum fee u64 +
+basis points u16).
+-/
+def transferFeeBodyLen : UInt64 := 108
+
+/-- Official `ExtensionType::TransferFeeAmount` ordinal (account-side, 8-byte body). -/
+def transferFeeAmountType : UInt64 := 2
+
+/-- Official `TransferFeeAmount` body length: withheld amount u64. -/
+def transferFeeAmountBodyLen : UInt64 := 8
+
 /-- Official `ExtensionType::MintCloseAuthority` ordinal. -/ 
 def mintCloseAuthorityType : UInt64 := 3
 
@@ -192,6 +208,17 @@ inductive Policy where
   zero-byte body) and then an end marker. Every other extension stays fail closed.
   -/
   | token2022NonTransferableMint
+  /--
+  Mint-only policy accepting exactly one official `TransferFeeConfig` (ordinal 1, official
+  108-byte body) and then an end marker. Every other extension stays fail closed.
+  -/
+  | token2022TransferFeeConfigMint
+  /--
+  Account-only policy accepting exactly one official `TransferFeeAmount` (ordinal 2,
+  8-byte body) and then an end marker. Required on source/destination accounts of a
+  transfer-fee mint; every other extension stays fail closed.
+  -/
+  | token2022TransferFeeAmountAccount
   deriving BEq, DecidableEq, Repr, Inhabited
 
 /-! ## Typed target plan -/
@@ -227,6 +254,8 @@ def planFor : Policy → Except String Plan
   | .token2022ImmutableOwner => .ok accountPlan
   | .token2022NonTransferableAccount => .ok accountPlan
   | .token2022NonTransferableMint => .ok mintPlan
+  | .token2022TransferFeeConfigMint => .ok mintPlan
+  | .token2022TransferFeeAmountAccount => .ok accountPlan
 
 def Plan.wellFormed (plan : Plan) : Bool :=
   plan.baseLen + plan.paddingBytes + 1 == tlvStart &&
@@ -396,6 +425,14 @@ def nonTransferableAccountAccept? (t : UInt64) : Bool :=
 /-- Accept only official `NonTransferable` (ordinal 9). -/
 def nonTransferableMintAccept? (t : UInt64) : Bool :=
   t == nonTransferableType
+/-- Accept only official `TransferFeeConfig` (ordinal 1). -/
+def transferFeeConfigMintAccept? (t : UInt64) : Bool :=
+  t == transferFeeConfigType
+
+/-- Accept only official `TransferFeeAmount` (ordinal 2). -/
+def transferFeeAmountAccountAccept? (t : UInt64) : Bool :=
+  t == transferFeeAmountType
+
 
 /-- Classifier selected by the closed policy vocabulary. -/
 def acceptFor : Policy → (UInt64 → Bool)
@@ -404,7 +441,8 @@ def acceptFor : Policy → (UInt64 → Bool)
   | .token2022ImmutableOwner => immutableOwnerAccept?
   | .token2022NonTransferableAccount => nonTransferableAccountAccept?
   | .token2022NonTransferableMint => nonTransferableMintAccept?
-
+  | .token2022TransferFeeConfigMint => transferFeeConfigMintAccept?
+  | .token2022TransferFeeAmountAccount => transferFeeAmountAccountAccept?
 /-- Fixed official body length required when a policy accepts a type; `none` means reject. -/
 def requiredBodyLen? : Policy → UInt64 → Option UInt64
   | .token2022MintClose, t =>
@@ -415,6 +453,10 @@ def requiredBodyLen? : Policy → UInt64 → Option UInt64
       if t == nonTransferableAccountType then some 0 else none
   | .token2022NonTransferableMint, t =>
       if t == nonTransferableType then some 0 else none
+  | .token2022TransferFeeConfigMint, t =>
+      if t == transferFeeConfigType then some transferFeeBodyLen else none
+  | .token2022TransferFeeAmountAccount, t =>
+      if t == transferFeeAmountType then some transferFeeAmountBodyLen else none
   | .token2022Base _, _ => none
 
 /--
@@ -501,7 +543,8 @@ theorem planFor_yields_wellFormed : ∀ p, ∃ plan, planFor p = .ok plan ∧ pl
   | token2022ImmutableOwner => exact ⟨accountPlan, rfl, accountPlan_wellFormed⟩
   | token2022NonTransferableAccount => exact ⟨accountPlan, rfl, accountPlan_wellFormed⟩
   | token2022NonTransferableMint => exact ⟨mintPlan, rfl, mintPlan_wellFormed⟩
-
+  | token2022TransferFeeConfigMint => exact ⟨mintPlan, rfl, mintPlan_wellFormed⟩
+  | token2022TransferFeeAmountAccount => exact ⟨accountPlan, rfl, accountPlan_wellFormed⟩
 /-- The classifier partitions every ordinal into the three official shapes. -/
 theorem classify_total (t : UInt64) :
     classify t = .endMarker ∨ (∃ t', classify t = .known t') ∨ (∃ t', classify t = .unknown t') := by

@@ -685,6 +685,30 @@ def token2022SetAccountAuthorityImmutable : UInt64 :=
     #[.u8le 6, .u8le 2, .u8le 1, .accKey 2]
 
 /--
+Token-2022 `TransferChecked` over a transfer-fee mint. External accounts mirror the base recipe:
+0 authority (signer), 1 source (writable), 2 mint, 3 destination (writable), 4 Token-2022
+program. The mint must carry exactly one official `TransferFeeConfig` extension entry (official
+108-byte body); source and destination must each carry exactly one official `TransferFeeAmount`
+entry (8-byte withheld body) — token-2022 requires it for fee-charging mints and rejects the
+CPI without it. The emitted preflight checks every byte of both admissions before any
+persistent write or CPI. The schedule math — newer fee once `clockEpoch` reaches its epoch,
+older otherwise — and the fee charge itself stay with the token program across the CPI
+boundary: the schedule bodies sit at non-word-aligned TLV offsets, so reading them on this
+target stays fail closed until a byte-granular account-data leaf lands.
+-/
+def token2022TransferCheckedTransferFee (amount : UInt64) (decimals : UInt64) : UInt64 :=
+  invoke 4
+    #[{ acc := 1, signer := false, writable := true,
+        accountData := some .token2022TransferFeeAmountAccount },
+      { acc := 2, signer := false, writable := false,
+        accountData := some .token2022TransferFeeConfigMint },
+      { acc := 3, signer := false, writable := true,
+        accountData := some .token2022TransferFeeAmountAccount },
+      { acc := 0, signer := true, writable := false }]
+    #[.u8le 12, .u64le amount, .u8le decimals]
+
+
+/--
 Token-2022 `TransferChecked` for the classic-compatible base slice, guarded by the bounded
 TLV account-data policy. The transaction must place the Token-2022 program at external index 4.
 The official state-with-extensions layout is parsed by a target-local bounded cursor before any
