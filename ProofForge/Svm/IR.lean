@@ -58,6 +58,10 @@ private partial def lowerOp : Ops.Op → Except String Op
   | .errorTyped frame => pure (.errorNamed frame.constructor)
   | .returnU64 value => pure (.returnU64 value)
   | .returnState value => pure (.returnState value)
+  -- Psy-target effects; unreachable for SVM sources but the shared Core Ops
+  -- define them, so the matcher must stay exhaustive.
+  | .emitEvent .. | .externalCall .. =>
+      throw "extract/ir: emitEvent/externalCall are Psy-target effects"
 
 where
   lowerOps (ops : Array Ops.Op) : Except String (Array Op) :=
@@ -395,6 +399,13 @@ private partial def rewriteRawArgsInOp (schemas : Array Core.Codec.Schema)
       return .errorTyped (← frame.mapValuesM (rewriteRawArg schemas entry base))
   | .returnU64 value => return .returnU64 (← rewriteRawArg schemas entry base value)
   | .returnState value => return .returnState (← rewriteRawArg schemas entry base value)
+  -- Psy-target effects; unreachable for SVM sources but the shared Core Ops
+  -- define them, so the matcher must stay exhaustive.
+  | .emitEvent name payload =>
+      return .emitEvent name (← rewriteRawArg schemas entry base payload)
+  | .externalCall callee args =>
+      return .externalCall callee
+        (← args.mapM (rewriteRawArg schemas entry base))
   | .ext payload => return .ext (← rewriteRawPayload schemas entry base payload)
 
 private partial def opLocalIds : Ops.Op → Array Nat
@@ -414,6 +425,10 @@ private partial def opLocalIds : Ops.Op → Array Nat
       Core.CFG.valueLocalIds value
   | .errorOverflow | .errorNamed _ => #[]
   | .errorTyped frame => frame.values.flatMap Core.CFG.valueLocalIds
+  -- Psy-target effects; unreachable for SVM sources but the shared Core Ops
+  -- define them, so the matcher must stay exhaustive.
+  | .emitEvent _ payload => Core.CFG.valueLocalIds payload
+  | .externalCall _ args => args.flatMap Core.CFG.valueLocalIds
   | .ext payload => (cfgPayloadValues payload).flatMap Core.CFG.valueLocalIds
 
 def Method.rawArgLocalBase (method : Method) : Nat :=

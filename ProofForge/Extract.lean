@@ -658,6 +658,10 @@ def extractMethod (env : Environment) (kind : Core.IR.MethodKind) (n : Name) :
       | .setLocal i v => .setLocal i (flipVal fuel' v)
       | .returnState v => .returnState (flipVal fuel' v)
       | .returnU64 v => .returnU64 (flipVal fuel' v)
+      -- Psy-target effects; unreachable for SVM sources but the shared Core
+      -- Ops define them, so the matcher must stay exhaustive.
+      | .emitEvent name payload => .emitEvent name (flipVal fuel' payload)
+      | .externalCall callee args => .externalCall callee (args.map (flipVal fuel'))
       | .storeField n v => .storeField n (flipVal fuel' v)
       | .okState v => .okState (flipVal fuel' v)
       | .checkedAddU64 l r => .checkedAddU64 (flipVal fuel' l) (flipVal fuel' r)
@@ -1016,6 +1020,10 @@ private def opFields : Ops.Op → Array FieldUse
   | .errorTyped frame => frame.values.flatMap valFields
   | .returnU64 v => valFields v
   | .returnState v => valFields v
+  -- Psy-target effects; unreachable for SVM sources but the shared Core Ops
+  -- define them, so the matcher must stay exhaustive.
+  | .emitEvent _ payload => valFields payload
+  | .externalCall _ args => args.flatMap valFields
 
 private def vectorLeafOffset? (schema : Core.Schema) (name leaf : String) : Option Nat :=
   match schema.vector? name with
@@ -1089,6 +1097,11 @@ private def resolveVectorLeaves (p : IR.Program) : Except String IR.Program := d
       | .errorTyped frame => return .errorTyped (← frame.mapValuesM normalizeVal)
       | .returnU64 v => return .returnU64 (← normalizeVal v)
       | .returnState v => return .returnState (← normalizeVal v)
+      -- Psy-target effects; unreachable for SVM sources but the shared Core
+      -- Ops define them, so the matcher must stay exhaustive.
+      | .emitEvent name payload => return .emitEvent name (← normalizeVal payload)
+      | .externalCall callee args =>
+          return .externalCall callee (← args.mapM normalizeVal)
       | .invoke programIx metas data seed bump =>
           return .invoke programIx metas (← data.mapM fun word =>
             match word.value? with
@@ -1161,6 +1174,10 @@ private partial def opEscapedArg (limit : Nat) : Ops.Op → Option Nat
   | .indexSetLeaf _ i v _ _ | .indexSet _ i v _ _ =>
       #[i, v].findSome? (valEscapedArg limit)
   | .storeField _ v | .okState v | .returnU64 v | .returnState v => valEscapedArg limit v
+  -- Psy-target effects; unreachable for SVM sources but the shared Core Ops
+  -- define them, so the matcher must stay exhaustive.
+  | .emitEvent _ payload => valEscapedArg limit payload
+  | .externalCall _ args => args.findSome? (valEscapedArg limit)
   | .errorOverflow | .errorNamed _ => none
   | .errorTyped frame => frame.values.findSome? (valEscapedArg limit)
 

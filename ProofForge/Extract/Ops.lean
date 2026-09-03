@@ -224,6 +224,10 @@ private def opValuesAny (predicate : Val → Bool) : Op → Bool
       data.any (fun word => word.value?.any predicate) || bump.any predicate
   | .ext (.svm (.component call)) => call.anyValue predicate
   | .errorTyped frame => frame.values.any predicate
+  -- Psy-target effects; unreachable for SVM sources but the shared Core Ops
+  -- define them, so the matcher must stay exhaustive.
+  | .emitEvent _ payload => predicate payload
+  | .externalCall _ args => args.any predicate
   | .joinLocal _ | .forBody _ _ | .errorOverflow | .errorNamed _ => false
 
 def hasLangOp (ops : Array Op) : Bool :=

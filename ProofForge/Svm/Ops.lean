@@ -429,6 +429,10 @@ private partial def opStaticPayloadsWellFormed : Op → Bool
             bump.all staticPayloadsWellFormed
       | .component call => call.allValues staticPayloadsWellFormed
   | .errorTyped frame => frame.values.all staticPayloadsWellFormed
+  -- Psy-target effects; unreachable for SVM sources but the shared Core Ops
+  -- define them, so the matcher must stay exhaustive.
+  | .emitEvent _ payload => staticPayloadsWellFormed payload
+  | .externalCall _ args => args.all staticPayloadsWellFormed
   | .joinLocal _ | .errorOverflow | .errorNamed _ => true
 
 def Op.wellFormed (op : Op) : Bool :=
@@ -551,6 +555,10 @@ partial def hasAccountView (ops : Array Op) : Bool :=
             data.any (fun word => word.value?.any valHasAccountView) ||
               bump.any valHasAccountView
     | .errorTyped frame => frame.values.any valHasAccountView
+    -- Psy-target effects; unreachable for SVM sources but the shared Core Ops
+    -- define them, so the matcher must stay exhaustive.
+    | .emitEvent _ payload => valHasAccountView payload
+    | .externalCall _ args => args.any valHasAccountView
     | .joinLocal _ | .errorOverflow | .errorNamed _ => false
     | .forBody _ body => hasAccountView body
 
