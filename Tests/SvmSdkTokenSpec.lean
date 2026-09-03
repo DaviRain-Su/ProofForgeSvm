@@ -2,6 +2,7 @@ import ProofForge.Svm.Sdk.Token
 import Examples.Svm.TokenXfer
 import Examples.Svm.TokenMint
 import Examples.Svm.TokenMint2
+import Examples.Svm.TokenMintBurn
 import Examples.Svm.TokenAcc
 import Examples.Svm.TokenApprove
 import Examples.Svm.TokenFreeze
@@ -33,6 +34,9 @@ open ProofForge.Svm.Sdk
 #guard Token.syncNative == 0
 #guard Token.initializeMultisig2 == 0
 #guard Token.baseAccountDataSize == 0
+#guard Token.mintTo 7 == 0
+#guard Token.burn 7 == 0
+#guard Token.initializeAccount2 == 0
 
 private def checkedAccounts : Token.CheckedTransferAccounts := .at 7 1 3 5 0
 private def uncheckedAccounts : Token.UncheckedTransferAccounts := .at 7 5 3 5
@@ -72,6 +76,7 @@ elab "#pf_guard_svm_token_facades" : command => do
   expectCanonical `Examples.Svm.TokenNative "5bc920f79c3711f0"
   expectCanonical `Examples.Svm.TokenSize "fa48e892121ea415"
   expectCanonical `Examples.Svm.TokenMs "672b83a54f057f79"
+  expectCanonical `Examples.Svm.TokenMintBurn "6d4481f063591326"
   expectCanonical `Examples.Svm.Seat "831f313077f89947"
 
 #pf_guard_svm_token_facades

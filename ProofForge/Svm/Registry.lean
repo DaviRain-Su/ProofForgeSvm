@@ -52,6 +52,7 @@ def entries : Array Entry := #[
   { name := "Token2022SizeVerified", digest := "e6d0ef0d76a16a7a" },
   { name := "SysSeed", digest := "490cec59af518f0c" },
   { name := "SysXfer", digest := "906efee37227cb35" },
+  { name := "TokenMintBurn", digest := "6d4481f063591326" },
   { name := "TokenMint2", digest := "89ae474933102cb4" },
   { name := "TokenNative", digest := "5bc920f79c3711f0" },
   { name := "Hash", digest := "b4b9944a712e0466" },

@@ -730,6 +730,40 @@ def tokenBurnChecked (amount : UInt64) (decimals : UInt64) : UInt64 :=
     #[.u8le 15, .u64le amount, .u8le decimals]
 
 /--
+Token `MintTo`（tag 7）：普通包装。外层 0 是 mint authority。
+内层：mint w / destination w / authority s。callee 是外层账户 3。
+-/
+def tokenMintTo (amount : UInt64) : UInt64 :=
+  invoke 3
+    #[{ acc := 1, signer := false, writable := true },
+      { acc := 2, signer := false, writable := true },
+      { acc := 0, signer := true, writable := false }]
+    #[.u8le 7, .u64le amount]
+
+/--
+Token `Burn`（tag 8）：普通包装。外层 0 是 token owner。
+内层：source w / mint w / authority s。callee 是外层账户 3。
+-/
+def tokenBurn (amount : UInt64) : UInt64 :=
+  invoke 3
+    #[{ acc := 1, signer := false, writable := true },
+      { acc := 2, signer := false, writable := true },
+      { acc := 0, signer := true, writable := false }]
+    #[.u8le 8, .u64le amount]
+
+/--
+Token `InitializeAccount2`（tag 16）：普通包装。owner = 外层账户 0 公钥。
+内层：account w / mint r / rent sysvar r。callee 是外层账户 4。
+-/
+def tokenInitAccount2 : UInt64 :=
+  invoke 4
+    #[{ acc := 1, signer := false, writable := true },
+      { acc := 2, signer := false, writable := false },
+      { acc := 3, signer := false, writable := false }]
+    #[.u8le 16, .accKey 0]
+
+
+/--
 Token `InitializeAccount3`：普通包装。owner = 外层账户 0 公钥。
 外层 0 是 owner。内层：account w / mint r。
 -/

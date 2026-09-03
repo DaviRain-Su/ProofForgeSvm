@@ -418,15 +418,31 @@ extraction-time constant. -/
 @[pf_inline] def burnChecked (amount decimals : UInt64) : UInt64 :=
   ProofForge.Svm.Runtime.tokenBurnChecked amount decimals
 
+/-- Closed classic Token `MintTo` (tag 7): external account 0 is the signing mint authority;
+mint is account 1 (writable), destination account 2 (writable). -/
+@[pf_inline] def mintTo (amount : UInt64) : UInt64 :=
+  ProofForge.Svm.Runtime.tokenMintTo amount
+
+/-- Closed classic Token `Burn` (tag 8): external account 0 is the signing token owner; source
+is account 1 (writable), mint account 2 (writable). -/
+@[pf_inline] def burn (amount : UInt64) : UInt64 :=
+  ProofForge.Svm.Runtime.tokenBurn amount
+
 /-- Closed classic Token `InitializeAccount3`: external account 0 is the new account owner;
 account is account 1 (writable), mint account 2 (read-only). -/
 @[pf_inline] def initializeAccount : UInt64 :=
   ProofForge.Svm.Runtime.tokenInitAccount
 
+/-- Closed classic Token `InitializeAccount2` (tag 16): external account 0 is the new account
+owner; account is account 1 (writable), mint account 2 (read-only), rent sysvar account 3. -/
+@[pf_inline] def initializeAccount2 : UInt64 :=
+  ProofForge.Svm.Runtime.tokenInitAccount2
+
 /-- Closed classic Token `InitializeMint2`: decimals are pinned to 6, mint authority is
 external account 0, and freeze authority is unset; mint is account 1 (writable). -/
 @[pf_inline] def initializeMint6 : UInt64 :=
   ProofForge.Svm.Runtime.tokenInitMint
+
 
 /-- Closed classic Token `CloseAccount`: external account 0 is the signing owner; source is
 account 1 (writable) and the lamport recipient is account 2 (writable). -/
