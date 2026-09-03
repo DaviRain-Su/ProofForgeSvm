@@ -114,6 +114,8 @@ native 32-byte value、以及运行时动态拼装 CPI 仍 fail closed。
 - `ownerIsSelf acc` — owner 32B 是否等于当前 program id；相等 0 / 不等 1。
 - `checkPda seed bump` — 旧的一条 ASCII 种子接口；链上只检查 bump 能否导出合法 PDA，成功 0 / 失败 1，不接收也不比较目标账户。需要完整 32B account-key 相等时使用 `checkPdaSeeds`。
 - `cpiReturn` — 最近一次 CPI 的 8 字节返回；`sol_get_return_data`。长度不是 8 → Custom(1)。
+- `cpiReturnLen` — 最近一次 CPI 返回数据的实际总长度（字节）；未设置时为 0。
+- `cpiReturnProgramIdWord word` — 最近一次 CPI 返回数据设置者 program id 的第 `word`（编译期字面量 0..3）个 u64；无返回数据 → Custom(1)。宽于 8 字节的 payload 窗口当前剖面 fail closed。
 - `tokenAccountSize` — Token GetAccountDataSize；返回值走 `cpiReturn`。
 
 把完整 32B key 当作单一值、运行时拼的 CPI（动态 program id / remaining accounts）
@@ -145,6 +147,8 @@ fail closed。常量 `acc < 64` 的账户 header 和四个 key / owner word 已�
 `Examples/Svm/TokenAuth.lean` + `runtime-tests/solana/tests/token_auth.rs`：SetAuthority 把 mint_authority 改成 acc2；Revoke 清掉 delegate；缺 signer → `Custom(1)`。
 `Examples/Svm/Epoch.lean` + `runtime-tests/solana/tests/epoch.rs`：默认 `slots_per_epoch` 432000；改 schedule 后再读一次。
 `Examples/Svm/TokenSize.lean` + `runtime-tests/solana/tests/token_size.rs`：GetAccountDataSize 返回 165；未使用的 dummy 不要求 signer。
+`Examples/Svm/TokenSizeVerified.lean` + `runtime-tests/solana/tests/token_size_verified.rs`：GetAccountDataSize 返回 165，且 `Sdk.ReturnData.setterIs` 校验返回数据设置者恰为 classic Token；token-2022 作 callee → `Custom(1)`。
+`Examples/Svm/Token2022SizeVerified.lean` + `runtime-tests/solana/tests/token_2022_size_verified.rs`：`ReturnData.len == 8` 且设置者恰为 Token-2022；classic Token 作 callee → `Custom(1)`。
 `Examples/Svm/SysSeed.lean` + `runtime-tests/solana/tests/sys_seed.rs`：AllocateWithSeed 开 16 字节；CreateAccountWithSeed 转 lamports；AssignWithSeed 改 owner；缺 signer → `Custom(1)`。
 `Examples/Svm/SysXfer.lean` + `runtime-tests/solana/tests/sys_xfer.rs`：TransferWithSeed 从 `create_with_seed(acc0, "vault", program)` 转 lamports；缺 signer → `Custom(1)`。
 `Examples/Svm/TokenMint2.lean` + `runtime-tests/solana/tests/token_mint2.rs`：InitializeMint2 写 decimals=6、authority=acc0；authority 不要求 signer。

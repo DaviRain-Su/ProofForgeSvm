@@ -82,6 +82,8 @@ inductive ValKind where
   | checkPda (seed : String)
   | rentExemption (dataLen : UInt64)
   | cpiReturn
+  | cpiReturnLen
+  | cpiReturnProgramIdWord (word : Nat)
   | sha256Lit (seed : String)
   | keccak256Lit (seed : String)
   | accKeyWord (acc word : Nat)
@@ -195,6 +197,8 @@ def findPda (seed : String) : Val := leaf (.findPda seed)
 def checkPda (seed : String) (bump : Val) : Val := .ext (.checkPda seed) #[bump]
 def rentExemption (dataLen : UInt64) : Val := leaf (.rentExemption dataLen)
 def cpiReturn : Val := leaf .cpiReturn
+def cpiReturnLen : Val := leaf .cpiReturnLen
+def cpiReturnProgramIdWord (word : Nat) : Val := leaf (.cpiReturnProgramIdWord word)
 def sha256Lit (seed : String) : Val := leaf (.sha256Lit seed)
 def keccak256Lit (seed : String) : Val := leaf (.keccak256Lit seed)
 def byteSwap64 (word : Val) : Val := .ext .byteSwap64 #[word]

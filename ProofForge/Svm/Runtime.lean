@@ -857,6 +857,20 @@ def tokenRevoke : UInt64 :=
 @[irreducible] def cpiReturn : UInt64 := 0
 
 /--
+最近一次 CPI 返回数据的实际总长度（字节）。无 CPI / 未设置时为 0。
+抽出后发射 `sol_get_return_data`。宿主侧是不可约 stub。
+-/
+@[irreducible] def cpiReturnLen : UInt64 := 0
+
+/--
+最近一次 CPI 返回数据设置者 program id 的第 `word` 个 u64（编译期字面量 0..3）。
+无返回数据时链上 Custom(1)。抽出后发射 `sol_get_return_data`。
+-/
+@[irreducible] def cpiReturnProgramIdWord (word : UInt64) : UInt64 :=
+  let _ := word
+  0
+
+/--
 Token `GetAccountDataSize`：普通包装。
 外层 1 是 mint，callee 是外层账户 2。返回值走 `cpiReturn`。
 -/

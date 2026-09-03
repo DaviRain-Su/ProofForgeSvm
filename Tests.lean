@@ -101,5 +101,6 @@ import Tests.SvmTelemetrySpec
 import Tests.LamportTransferSpec
 import Tests.SvmSdkPubkeySpec
 import Tests.TokenShapeSpec
+import Tests.SvmReturnDataSpec
 import Tests.ProofSpec
 import Tests.SemanticsSpec

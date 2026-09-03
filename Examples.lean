@@ -85,6 +85,8 @@ import Examples.Svm.RentTopUp
 import Examples.Svm.Token2022MintClose
 import Examples.Svm.TransientPubkeyBatch
 import Examples.Svm.TransientPubkeyRing
+import Examples.Svm.TokenSizeVerified
+import Examples.Svm.Token2022SizeVerified
 import Examples.Svm.VaultRentGrow
 import Examples.Svm.VersionedPayloadMigrator
 

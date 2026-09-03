@@ -912,6 +912,8 @@ private partial def valCanon : Ops.Val → String
   | .ext (.checkPda seed) #[bump] => s!"chk.{seed}:{valCanon bump}"
   | .ext (.rentExemption len) #[] => s!"rent.{len.toNat}"
   | .ext .cpiReturn #[] => "cret"
+  | .ext .cpiReturnLen #[] => "cretlen"
+  | .ext (.cpiReturnProgramIdWord word) #[] => s!"cretpid.{word}"
   | .ext (.sha256Lit seed) #[] => s!"sha.{seed}"
   | .ext (.keccak256Lit seed) #[] => s!"kec.{seed}"
   | .ext .byteSwap64 #[word] => s!"bswap64({valCanon word})"

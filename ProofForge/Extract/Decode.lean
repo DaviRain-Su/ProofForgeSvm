@@ -805,6 +805,16 @@ private partial def asValNamed (env : Environment) (fuel : Nat) (n : Name) (e : 
     some (.ext (.svm (.component (.sysvar (.epochSchedule .firstNormalSlot)))) #[])
   else if endsWith e ".cpiReturn" || isConstNamed e ``ProofForge.Svm.Runtime.cpiReturn then
     some .cpiReturn
+  else if endsWith e ".cpiReturnLen" || isConstNamed e ``ProofForge.Svm.Runtime.cpiReturnLen then
+    some .cpiReturnLen
+  else if (endsWith e ".cpiReturnProgramIdWord" ||
+      isConstNamed e ``ProofForge.Svm.Runtime.cpiReturnProgramIdWord) &&
+      e.getAppArgs.size ≥ 1 then
+    match asStaticLit env fuel e.getAppArgs[e.getAppArgs.size - 1]! with
+    | some (.lit word) =>
+      let w := word.toNat
+      if w ≤ 3 then some (.cpiReturnProgramIdWord w) else none
+    | _ => none
   else if endsWith e ".signerKey0" || isConstNamed e ``ProofForge.Svm.Runtime.signerKey0 then
     some .signerKey0
   else if endsWith e ".accLamports0" || isConstNamed e ``ProofForge.Svm.Runtime.accLamports0 then
@@ -2142,6 +2152,8 @@ private def asOkStateCore (env : Environment) (e : Expr) : Option Ops.Val :=
             | some (.unixTime) => some .unixTime
             | some (.slotsPerEpoch) => some .slotsPerEpoch
             | some (.cpiReturn) => some .cpiReturn
+            | some (.cpiReturnLen) => some .cpiReturnLen
+            | some (.cpiReturnProgramIdWord w) => some (.cpiReturnProgramIdWord w)
             | some (.signerKey0) => some .signerKey0
             | some (.accLamports0) => some .accLamports0
             | some (.accOwner0) => some .accOwner0
@@ -5161,7 +5173,8 @@ private def decodePlain (env : Environment) (e : Expr) (stateful : Bool)
     | .accN | .isSigner0 | .isWritable0 | .isExecutable0
     | .accLamports1 | .accOwner1 | .accDataLen1
     | .isSigner1 | .isWritable1 | .isExecutable1 | .findPda _
-    | .checkPda _ _ | .rentExemption _ | .cpiReturn | .sha256Lit _ | .keccak256Lit _
+    | .checkPda _ _ | .rentExemption _ | .cpiReturn | .cpiReturnLen | .cpiReturnProgramIdWord _
+    | .sha256Lit _ | .keccak256Lit _
     | .byteSwap64 _
     | .accKeyWord _ _ | .accOwnerWord _ _ | .accDataWord _ _ | .accDataWordAt ..
     | .ext (.svm (.component _)) _

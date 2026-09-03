@@ -528,6 +528,45 @@ cpi_ret_ok_{scope}_{stackOff}:
   ldxdw r1, [r10 - {payloadDist}]
   stxdw [r10 - {stackOff}], r1
 "
+/-- 最近一次 CPI 返回数据的实际总长度。无 CPI / 未设置时为 0。 -/
+private def emitLoadCpiReturnLen (stackOff : Nat) (_scope : String) : Except String String := do
+  let staging ← Scratch.returnDataStaging
+  let payloadDist := staging.payload.stackDistance Scratch.returnDataBank
+  let programIdDist := staging.programId.stackDistance Scratch.returnDataBank
+  return s!"\
+  ; load cpiReturnLen via sol_get_return_data
+  mov64 r1, r10
+  add64 r1, -{payloadDist}
+  lddw r2, 8
+  mov64 r3, r10
+  add64 r3, -{programIdDist}
+  call sol_get_return_data
+  stxdw [r10 - {stackOff}], r0
+"
+
+/-- 最近一次 CPI 返回数据设置者 program id 的第 word 个 u64。无返回数据则 Custom(1)。 -/
+private def emitLoadCpiReturnProgramIdWord (word : Nat) (stackOff : Nat) (scope : String) :
+    Except String String := do
+  let staging ← Scratch.returnDataStaging
+  let payloadDist := staging.payload.stackDistance Scratch.returnDataBank
+  let programIdDist := staging.programId.stackDistance Scratch.returnDataBank
+  return s!"\
+  ; load cpiReturnProgramIdWord {word} via sol_get_return_data
+  mov64 r1, r10
+  add64 r1, -{payloadDist}
+  lddw r2, 8
+  mov64 r3, r10
+  add64 r3, -{programIdDist}
+  call sol_get_return_data
+  jne r0, 0, cpi_ret_pid_ok_{scope}_{stackOff}
+  lddw r0, 0x1
+  exit
+cpi_ret_pid_ok_{scope}_{stackOff}:
+  ldxdw r1, [r10 - {programIdDist - 8 * word}]
+  stxdw [r10 - {stackOff}], r1
+"
+
+
 
 private def emitLoadSignerKey0 (stackOff : Nat) : String :=
   s!"\
@@ -1045,6 +1084,10 @@ private partial def loadVal (p : IR.Program) (v : Ops.Val) (stackOff : Nat) (non
     Sysvar.Emit.emitQuery (.epochSchedule .slotsPerEpoch) #[] stackOff scope
   | .ext .cpiReturn #[] =>
     emitLoadCpiReturn stackOff scope
+  | .ext .cpiReturnLen #[] =>
+    emitLoadCpiReturnLen stackOff scope
+  | .ext (.cpiReturnProgramIdWord word) #[] =>
+    emitLoadCpiReturnProgramIdWord word stackOff scope
   | .ext .signerKey0 #[] =>
     .ok (emitLoadSignerKey0 stackOff)
   | .ext .accLamports0 #[] =>

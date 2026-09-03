@@ -45,6 +45,8 @@ def entries : Array Entry := #[
   { name := "TokenAuth", digest := "bf3d403346f51b82" },
   { name := "Epoch", digest := "10ccb16ffbd7b903" },
   { name := "TokenSize", digest := "fa48e892121ea415" },
+  { name := "TokenSizeVerified", digest := "69cdf0151569dbc8" },
+  { name := "Token2022SizeVerified", digest := "e6d0ef0d76a16a7a" },
   { name := "SysSeed", digest := "490cec59af518f0c" },
   { name := "SysXfer", digest := "906efee37227cb35" },
   { name := "TokenMint2", digest := "89ae474933102cb4" },

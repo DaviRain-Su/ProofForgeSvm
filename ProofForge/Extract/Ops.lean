@@ -37,6 +37,9 @@ private def svmLeaf (kind : Svm.Ops.ValKind) : Val :=
 @[match_pattern] def Val.rentExemption (dataLen : UInt64) : Val :=
   svmLeaf (.rentExemption dataLen)
 @[match_pattern] def Val.cpiReturn : Val := svmLeaf .cpiReturn
+@[match_pattern] def Val.cpiReturnLen : Val := svmLeaf .cpiReturnLen
+@[match_pattern] def Val.cpiReturnProgramIdWord (word : Nat) : Val :=
+  svmLeaf (.cpiReturnProgramIdWord word)
 @[match_pattern] def Val.sha256Lit (seed : String) : Val := svmLeaf (.sha256Lit seed)
 @[match_pattern] def Val.keccak256Lit (seed : String) : Val := svmLeaf (.keccak256Lit seed)
 @[match_pattern] def Val.byteSwap64 (word : Val) : Val :=
