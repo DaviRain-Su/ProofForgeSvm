@@ -48,6 +48,7 @@ Examples/Svm/SysSeed.lean
 Examples/Svm/SysXfer.lean
 Examples/Svm/Token2022.lean
 Examples/Svm/Token2022MintClose.lean
+Examples/Svm/Token2022Ext.lean
 Examples/Svm/TokenAcc.lean
 Examples/Svm/TokenApprove.lean
 Examples/Svm/TokenAuth.lean

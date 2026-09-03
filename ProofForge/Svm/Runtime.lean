@@ -641,6 +641,50 @@ def tokenApproveCheckedMs2 (amount : UInt64) (decimals : UInt64) : UInt64 :=
     #[.u8le 13, .u64le amount, .u8le decimals]
 
 /--
+Token-2022 `TransferChecked` whose source/destination accounts may each carry exactly one
+official `ImmutableOwner` marker (zero-byte). The mint stays on the closed base policy; ordinary
+transfers remain valid on immutable-owner accounts.
+-/
+def token2022TransferCheckedImmutable (amount : UInt64) (decimals : UInt64) : UInt64 :=
+  invoke 4
+    #[{ acc := 1, signer := false, writable := true,
+        accountData := some .token2022ImmutableOwner },
+      { acc := 2, signer := false, writable := false,
+        accountData := some (.token2022Base .mint) },
+      { acc := 3, signer := false, writable := true,
+        accountData := some .token2022ImmutableOwner },
+      { acc := 0, signer := true, writable := false }]
+    #[.u8le 12, .u64le amount, .u8le decimals]
+
+/--
+Token-2022 `TransferChecked` over an official NonTransferable mint/account pair. The closed
+marker policies accept exactly the official markers; the token program owns the on-chain
+rejection of the transfer itself.
+-/
+def token2022TransferCheckedNonTransferable (amount : UInt64) (decimals : UInt64) : UInt64 :=
+  invoke 4
+    #[{ acc := 1, signer := false, writable := true,
+        accountData := some .token2022NonTransferableAccount },
+      { acc := 2, signer := false, writable := false,
+        accountData := some .token2022NonTransferableMint },
+      { acc := 3, signer := false, writable := true,
+        accountData := some .token2022NonTransferableAccount },
+      { acc := 0, signer := true, writable := false }]
+    #[.u8le 12, .u64le amount, .u8le decimals]
+
+/--
+Token-2022 `SetAuthority` (`AccountOwner`) over an `ImmutableOwner` account. The new owner is
+the public key of external account 2; the account-data policy accepts exactly the official
+marker and the token program owns the on-chain rejection.
+-/
+def token2022SetAccountAuthorityImmutable : UInt64 :=
+  invoke 3
+    #[{ acc := 1, signer := false, writable := true,
+        accountData := some .token2022ImmutableOwner },
+      { acc := 0, signer := true, writable := false }]
+    #[.u8le 6, .u8le 2, .u8le 1, .accKey 2]
+
+/--
 Token-2022 `TransferChecked` for the classic-compatible base slice, guarded by the bounded
 TLV account-data policy. The transaction must place the Token-2022 program at external index 4.
 The official state-with-extensions layout is parsed by a target-local bounded cursor before any

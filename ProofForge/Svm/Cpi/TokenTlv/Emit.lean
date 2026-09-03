@@ -112,6 +112,46 @@ private def emitMintCloseTlv (err next endCheck afterClose : String) : String :=
 "
 
 /--
+Zero-byte marker specialization: accept the given extension type with a zero body once, then
+require end (or no further bytes). Shared by ImmutableOwner/NonTransferable marker policies.
+-/
+private def emitMarkerTlv (err next endCheck afterClose : String) (markerType : Nat) : String :=
+  let afterHeader := tlvStart + 4
+  s!"\
+  ; marker TLV: allow type={markerType} with zero body once, then end, or end alone
+  mov64 r4, r2
+  sub64 r4, {tlvStart}
+  jeq r4, 0, {next}
+  jeq r4, 1, {next}
+  ldxb r5, [r3 + {tlvStart}]
+  ldxb r6, [r3 + {tlvStart + 1}]
+  jne r6, 0, {err}
+  jeq r5, 0, {endCheck}
+  jne r5, {markerType}, {err}
+  ; zero-byte body: length field must be 0
+  ldxb r5, [r3 + {tlvStart + 2}]
+  jne r5, 0, {err}
+  ldxb r5, [r3 + {tlvStart + 3}]
+  jne r5, 0, {err}
+  ; after header: require end/padding
+  mov64 r4, r2
+  sub64 r4, {afterHeader}
+  jeq r4, 0, {next}
+  jeq r4, 1, {next}
+  ldxb r5, [r3 + {afterHeader}]
+  jne r5, 0, {err}
+  ldxb r5, [r3 + {afterHeader + 1}]
+  jne r5, 0, {err}
+  ja {next}
+{endCheck}:
+  jgt r4, 3, {afterClose}
+  ja {next}
+{afterClose}:
+  jne r6, 0, {err}
+  ja {next}
+"
+
+/--
 Emit the TLV policy preflight for the account at physical index `physical`. All rejection paths
 jump to the shared `cpi_data_len_err_{label}` exit; the accept path falls through to
 `cpi_data_len_next_{label}_p{physical}` then onward.
@@ -140,6 +180,27 @@ def emitPreflight (ctx : Context) (label : String) (physical : Nat) (policy : Po
     return s!"\
   ; token-2022 TLV mint-close policy for physical account {physical}
 {base}{emitMintCloseTlv err next endCheck afterClose}{next}:
+"
+  | .token2022ImmutableOwner =>
+    let endCheck := s!"cpi_data_len_ok_{label}_p{physical}_end"
+    let afterClose := s!"cpi_data_len_ok_{label}_p{physical}_after_close"
+    return s!"\
+  ; token-2022 TLV immutable-owner policy for physical account {physical}
+{base}{emitMarkerTlv err next endCheck afterClose (UInt64.toNat immutableOwnerType)}{next}:
+"
+  | .token2022NonTransferableAccount =>
+    let endCheck := s!"cpi_data_len_ok_{label}_p{physical}_end"
+    let afterClose := s!"cpi_data_len_ok_{label}_p{physical}_after_close"
+    return s!"\
+  ; token-2022 TLV non-transferable-account policy for physical account {physical}
+{base}{emitMarkerTlv err next endCheck afterClose (UInt64.toNat nonTransferableAccountType)}{next}:
+"
+  | .token2022NonTransferableMint =>
+    let endCheck := s!"cpi_data_len_ok_{label}_p{physical}_end"
+    let afterClose := s!"cpi_data_len_ok_{label}_p{physical}_after_close"
+    return s!"\
+  ; token-2022 TLV non-transferable-mint policy for physical account {physical}
+{base}{emitMarkerTlv err next endCheck afterClose (UInt64.toNat nonTransferableType)}{next}:
 "
 
 end ProofForge.Svm.Cpi.TokenTlv.Emit

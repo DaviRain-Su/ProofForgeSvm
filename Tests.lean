@@ -102,6 +102,7 @@ import Tests.LamportTransferSpec
 import Tests.SvmSdkPubkeySpec
 import Tests.TokenShapeSpec
 import Tests.SvmReturnDataSpec
+import Tests.SvmToken2022ExtSpec
 import Tests.SvmHashWordsSpec
 import Tests.ProofSpec
 import Tests.SemanticsSpec

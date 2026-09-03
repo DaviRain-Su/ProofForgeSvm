@@ -32,6 +32,27 @@ extension. Source and destination accounts remain on the closed base TLV policy.
 @[pf_inline] def transferCheckedMintClose (amount decimals : UInt64) : UInt64 :=
   ProofForge.Svm.Runtime.token2022TransferCheckedMintClose amount decimals
 
+/--
+Token-2022 `TransferChecked` whose source/destination accounts may each carry exactly one
+official `ImmutableOwner` marker; the mint stays on the closed base policy.
+-/
+@[pf_inline] def transferCheckedImmutable (amount decimals : UInt64) : UInt64 :=
+  ProofForge.Svm.Runtime.token2022TransferCheckedImmutable amount decimals
+
+/--
+Token-2022 `TransferChecked` over an official NonTransferable mint/account pair; the token
+program owns the on-chain rejection of the transfer itself.
+-/
+@[pf_inline] def transferCheckedNonTransferable (amount decimals : UInt64) : UInt64 :=
+  ProofForge.Svm.Runtime.token2022TransferCheckedNonTransferable amount decimals
+
+/--
+Token-2022 `SetAuthority` (`AccountOwner`) over an `ImmutableOwner` account; the token program
+owns the on-chain rejection. The new owner is the public key of external account 2.
+-/
+@[pf_inline] def setAccountAuthorityImmutable : UInt64 :=
+  ProofForge.Svm.Runtime.token2022SetAccountAuthorityImmutable
+
 /-- Host-side view of a successfully parsed mint-close authority pubkey (32 raw bytes). -/
 structure MintCloseAuthority where
   bytes : Array UInt8
@@ -66,5 +87,30 @@ def parseMintCloseAuthority (data : Array UInt8) : Option MintCloseAuthority :=
           acc.push data[start + i]!
         let out := { bytes := bytes : MintCloseAuthority }
         if out.wellFormed then some out else none
+
+/-- Host-side check: the account buffer parses as extension form carrying exactly the official
+`ImmutableOwner` marker under the closed policy. Classic 165-byte accounts return `false`. -/
+def accountHasImmutableOwner (data : Array UInt8) : Bool :=
+  data.size > ProofForge.Svm.Cpi.TokenTlv.accountBaseLen &&
+    match ProofForge.Svm.Cpi.TokenTlv.evaluatePolicy .token2022ImmutableOwner (viewOf data) with
+    | .accept => true
+    | .reject _ => false
+
+/-- Host-side check: the account buffer parses as extension form carrying exactly the official
+`NonTransferableAccount` marker under the closed policy. -/
+def accountHasNonTransferable (data : Array UInt8) : Bool :=
+  data.size > ProofForge.Svm.Cpi.TokenTlv.accountBaseLen &&
+    match ProofForge.Svm.Cpi.TokenTlv.evaluatePolicy .token2022NonTransferableAccount (viewOf data) with
+    | .accept => true
+    | .reject _ => false
+
+/-- Host-side check: the mint buffer parses as extension form carrying exactly the official
+`NonTransferable` marker under the closed policy. -/
+def mintHasNonTransferable (data : Array UInt8) : Bool :=
+  data.size > ProofForge.Svm.Cpi.TokenTlv.mintBaseLen + ProofForge.Svm.Cpi.TokenTlv.mintPaddingBytes + 1 &&
+    match ProofForge.Svm.Cpi.TokenTlv.evaluatePolicy .token2022NonTransferableMint (viewOf data) with
+    | .accept => true
+    | .reject _ => false
+
 
 end ProofForge.Svm.Sdk.Token2022

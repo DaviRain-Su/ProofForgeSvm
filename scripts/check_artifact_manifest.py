@@ -38,7 +38,7 @@ class TargetSpec:
 SVM = TargetSpec(
     key="svm",
     registry_rel=Path("ProofForge/Svm/Registry.lean"),
-    expected_count=87,
+    expected_count=88,
     suffixes=(".so", ".s", ".idl.json"),
     digest_suffix=".s",
 )

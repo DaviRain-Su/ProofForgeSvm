@@ -2483,6 +2483,15 @@ private def asAccountDataPolicy (e : Expr) :
     else if isConstNamed p ``ProofForge.Svm.Cpi.TokenTlv.Policy.token2022MintClose ||
         endsWith p ".token2022MintClose" then
       some (some .token2022MintClose)
+    else if isConstNamed p ``ProofForge.Svm.Cpi.TokenTlv.Policy.token2022ImmutableOwner ||
+        endsWith p ".token2022ImmutableOwner" then
+      some (some .token2022ImmutableOwner)
+    else if isConstNamed p ``ProofForge.Svm.Cpi.TokenTlv.Policy.token2022NonTransferableAccount ||
+        endsWith p ".token2022NonTransferableAccount" then
+      some (some .token2022NonTransferableAccount)
+    else if isConstNamed p ``ProofForge.Svm.Cpi.TokenTlv.Policy.token2022NonTransferableMint ||
+        endsWith p ".token2022NonTransferableMint" then
+      some (some .token2022NonTransferableMint)
     else none
   else none
 

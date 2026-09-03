@@ -78,6 +78,15 @@ def mintCloseAuthorityType : UInt64 := 3
 /-- Official `MintCloseAuthority` payload size (`OptionalNonZeroPubkey`). -/ 
 def mintCloseAuthorityBodyLen : UInt64 := 32
 
+/-- Official `ExtensionType::ImmutableOwner` ordinal (account-side zero-byte marker). -/
+def immutableOwnerType : UInt64 := 7
+
+/-- Official `ExtensionType::NonTransferable` ordinal (mint-side zero-byte marker). -/
+def nonTransferableType : UInt64 := 9
+
+/-- Official `ExtensionType::NonTransferableAccount` ordinal (account-side zero-byte marker). -/
+def nonTransferableAccountType : UInt64 := 13
+
 /-- `AccountType::Mint`. -/
 def mintTypeByte : Nat := 1
 
@@ -166,6 +175,23 @@ inductive Policy where
   Account metas must still use `token2022Base .account`.
   -/
   | token2022MintClose
+  /--
+  Account-only policy accepting exactly one official `ImmutableOwner` marker (ordinal 7,
+  zero-byte body) and then an end marker. Every other extension stays fail closed. Ordinary
+  transfers remain valid on immutable-owner accounts; only owner changes are rejected on chain.
+  -/
+  | token2022ImmutableOwner
+  /--
+  Account-only policy accepting exactly one official `NonTransferableAccount` marker (ordinal
+  13, zero-byte body) and then an end marker. Transfer paths reach the token program, which
+  owns the rejection; every other extension stays fail closed.
+  -/
+  | token2022NonTransferableAccount
+  /--
+  Mint-only policy accepting exactly one official `NonTransferable` marker (ordinal 9,
+  zero-byte body) and then an end marker. Every other extension stays fail closed.
+  -/
+  | token2022NonTransferableMint
   deriving BEq, DecidableEq, Repr, Inhabited
 
 /-! ## Typed target plan -/
@@ -198,6 +224,9 @@ def planFor : Policy → Except String Plan
   | .token2022Base .mint => .ok mintPlan
   | .token2022Base .account => .ok accountPlan
   | .token2022MintClose => .ok mintPlan
+  | .token2022ImmutableOwner => .ok accountPlan
+  | .token2022NonTransferableAccount => .ok accountPlan
+  | .token2022NonTransferableMint => .ok mintPlan
 
 def Plan.wellFormed (plan : Plan) : Bool :=
   plan.baseLen + plan.paddingBytes + 1 == tlvStart &&
@@ -356,15 +385,36 @@ def closedAccept? (_ : UInt64) : Bool := false
 def mintCloseAccept? (t : UInt64) : Bool :=
   t == mintCloseAuthorityType
 
+/-- Accept only official `ImmutableOwner` (ordinal 7). -/
+def immutableOwnerAccept? (t : UInt64) : Bool :=
+  t == immutableOwnerType
+
+/-- Accept only official `NonTransferableAccount` (ordinal 13). -/
+def nonTransferableAccountAccept? (t : UInt64) : Bool :=
+  t == nonTransferableAccountType
+
+/-- Accept only official `NonTransferable` (ordinal 9). -/
+def nonTransferableMintAccept? (t : UInt64) : Bool :=
+  t == nonTransferableType
+
 /-- Classifier selected by the closed policy vocabulary. -/
 def acceptFor : Policy → (UInt64 → Bool)
   | .token2022Base _ => closedAccept?
   | .token2022MintClose => mintCloseAccept?
+  | .token2022ImmutableOwner => immutableOwnerAccept?
+  | .token2022NonTransferableAccount => nonTransferableAccountAccept?
+  | .token2022NonTransferableMint => nonTransferableMintAccept?
 
 /-- Fixed official body length required when a policy accepts a type; `none` means reject. -/
 def requiredBodyLen? : Policy → UInt64 → Option UInt64
   | .token2022MintClose, t =>
       if t == mintCloseAuthorityType then some mintCloseAuthorityBodyLen else none
+  | .token2022ImmutableOwner, t =>
+      if t == immutableOwnerType then some 0 else none
+  | .token2022NonTransferableAccount, t =>
+      if t == nonTransferableAccountType then some 0 else none
+  | .token2022NonTransferableMint, t =>
+      if t == nonTransferableType then some 0 else none
   | .token2022Base _, _ => none
 
 /--
@@ -448,6 +498,9 @@ theorem planFor_yields_wellFormed : ∀ p, ∃ plan, planFor p = .ok plan ∧ pl
     | mint => exact ⟨mintPlan, rfl, mintPlan_wellFormed⟩
     | account => exact ⟨accountPlan, rfl, accountPlan_wellFormed⟩
   | token2022MintClose => exact ⟨mintPlan, rfl, mintPlan_wellFormed⟩
+  | token2022ImmutableOwner => exact ⟨accountPlan, rfl, accountPlan_wellFormed⟩
+  | token2022NonTransferableAccount => exact ⟨accountPlan, rfl, accountPlan_wellFormed⟩
+  | token2022NonTransferableMint => exact ⟨mintPlan, rfl, mintPlan_wellFormed⟩
 
 /-- The classifier partitions every ordinal into the three official shapes. -/
 theorem classify_total (t : UInt64) :

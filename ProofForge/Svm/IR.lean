@@ -980,6 +980,9 @@ private partial def opsCanon (ops : Array Op) : String :=
             | some (.token2022Base .mint) => "~t22mint"
             | some (.token2022Base .account) => "~t22acct"
             | some .token2022MintClose => "~t22mintclose"
+            | some .token2022ImmutableOwner => "~t22immuowner"
+            | some .token2022NonTransferableAccount => "~t22ntacct"
+            | some .token2022NonTransferableMint => "~t22ntmint"
             | none => ""
           s!"{entry.acc}{if entry.signer then "s" else ""}{if entry.writable then "w" else ""}{dataLen}{policy}"
         let wordCanon (word : Ops.CpiWord Ops.Val) : String :=
