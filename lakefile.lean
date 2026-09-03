@@ -52,6 +52,7 @@ lean_lib ProofForgeSvmSdk where
     `ProofForge.Svm.Sdk.Telemetry,
     `ProofForge.Svm.Sdk.Queue,
     `ProofForge.Svm.Sdk.ReturnData,
+    `ProofForge.Svm.Sdk.Hash,
     `ProofForge.Svm.Sdk.Transient,
     `ProofForge.Svm.Sdk.TransientBytes,
     `ProofForge.Svm.Sdk.TransientRecord64,

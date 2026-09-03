@@ -85,6 +85,9 @@ import Examples.Svm.RentTopUp
 import Examples.Svm.Token2022MintClose
 import Examples.Svm.TransientPubkeyBatch
 import Examples.Svm.TransientPubkeyRing
+import Examples.Svm.HashWords
+import Examples.Svm.HashDataSha
+import Examples.Svm.HashDataKeccak
 import Examples.Svm.TokenSizeVerified
 import Examples.Svm.Token2022SizeVerified
 import Examples.Svm.VaultRentGrow

@@ -621,7 +621,7 @@ def extractMethod (env : Environment) (kind : Core.IR.MethodKind) (n : Name) :
       | .accN | .isSigner0 | .isWritable0 | .isExecutable0
       | .accLamports1 | .accOwner1 | .accDataLen1
       | .isSigner1 | .isWritable1 | .isExecutable1 | .findPda _
-      | .rentExemption _ | .cpiReturn | .cpiReturnLen | .cpiReturnProgramIdWord _ | .sha256Lit _ | .keccak256Lit _
+      | .rentExemption _ | .cpiReturn | .cpiReturnLen | .cpiReturnProgramIdWord _ | .sha256Lit _ | .sha256LitWord _ _ | .keccak256Lit _ | .keccak256LitWord _ _
       | .accKeyWord _ _ | .accOwnerWord _ _ | .accDataWord _ _
       | .accLamportsN _ | .accDataLenN _ | .isSignerN _ | .isWritableN _ | .isExecutableN _
       | .signerKeyN _ | .ownerIsSelf _ | .findPdaSeeds _ | .checkPdaSeeds _ _ => v
@@ -972,7 +972,7 @@ private partial def valFields : Ops.Val → Array FieldUse
   | .accN | .isSigner0 | .isWritable0 | .isExecutable0
   | .accLamports1 | .accOwner1 | .accDataLen1
   | .isSigner1 | .isWritable1 | .isExecutable1 | .findPda _
-  | .rentExemption _ | .cpiReturn | .cpiReturnLen | .cpiReturnProgramIdWord _ | .sha256Lit _ | .keccak256Lit _
+  | .rentExemption _ | .cpiReturn | .cpiReturnLen | .cpiReturnProgramIdWord _ | .sha256Lit _ | .sha256LitWord _ _ | .keccak256Lit _ | .keccak256LitWord _ _
   | .accKeyWord _ _ | .accOwnerWord _ _ | .accDataWord _ _
   | .accLamportsN _ | .accDataLenN _ | .isSignerN _ | .isWritableN _ | .isExecutableN _
   | .signerKeyN _ | .ownerIsSelf _ | .findPdaSeeds _ | .checkPdaSeeds _ _ => #[]

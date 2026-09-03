@@ -117,6 +117,9 @@ native 32-byte value、以及运行时动态拼装 CPI 仍 fail closed。
 - `cpiReturnLen` — 最近一次 CPI 返回数据的实际总长度（字节）；未设置时为 0。
 - `cpiReturnProgramIdWord word` — 最近一次 CPI 返回数据设置者 program id 的第 `word`（编译期字面量 0..3）个 u64；无返回数据 → Custom(1)。宽于 8 字节的 payload 窗口当前剖面 fail closed。
 - `tokenAccountSize` — Token GetAccountDataSize；返回值走 `cpiReturn`。
+- `sha256Lit seed` / `keccak256Lit seed` — 编译期 ASCII 字面量 digest 首 u64。
+- `sha256LitWord seed word` / `keccak256LitWord seed word` — 字面量 digest 的第 `word`（0..3）个 u64，凑齐完整 32B。
+- `sha256DataWord acc off len word` / `keccak256DataWord acc off len word` — 账户 `acc` 数据区 `[off, off+len)` 的单切片 digest 第 `word` 个 u64；`len ≤ 1024`，越界读 → Custom(1)。多切片拼接、运行时拼缓冲、blake3/sha512/poseidon/secp256k1 本剖面 fail closed。
 
 把完整 32B key 当作单一值、运行时拼的 CPI（动态 program id / remaining accounts）
 fail closed。常量 `acc < 64` 的账户 header 和四个 key / owner word 已开；编译期钉死的
@@ -129,6 +132,8 @@ fail closed。常量 `acc < 64` 的账户 header 和四个 key / owner word 已�
 `Examples/Svm/Info.lean` + `runtime-tests/solana/tests/info.rs`：余额 / owner 首 u64 / data_len / NUM_ACCOUNTS / 三旗；只读不改账户数据。
 `Examples/Svm/Peer.lean` + `runtime-tests/solana/tests/peer.rs`：账户 1 的 lamports / owner 首 u64 / data_len / 三旗；缺第二账户 → `Custom(1)`。
 `Examples/Svm/Hash.lean` + `runtime-tests/solana/tests/hash.rs`：`sha256Lit "vault"` / `"ok"` / `""` 的首 u64 与宿主 `sha2` 一致。
+`Examples/Svm/HashWords.lean` + `runtime-tests/solana/tests/hash_words.rs`：`sha256LitWord` / `keccak256LitWord "vault"` 四字全部与宿主 sha2/sha3 一致。
+`Examples/Svm/HashDataSha.lean` / `HashDataKeccak.lean` + `runtime-tests/solana/tests/hash_data.rs`：账户数据 `[0,32)` 与 `[4,36)` 单切片 digest 与宿主一致；短账户越界读 → `Custom(1)`。
 `Examples/Svm/Keccak.lean` + `runtime-tests/solana/tests/keccak.rs`：`keccak256Lit "vault"` / `"ok"` / `""` 的首 u64 与宿主 `sha3::Keccak256` 一致。
 `Examples/Svm/Keys.lean` + `runtime-tests/solana/tests/keys.rs`：账户 0/1 的 key / owner 按字读与宿主 `Pubkey` 一致；读 key 字不强制 signer；缺第二账户 → `Custom(1)`。
 `Examples/Svm/Trio.lean` + `runtime-tests/solana/tests/trio.rs`：账户 2 header / key 字；`signerKey 1` 缺签名 Custom(1)；`ownerIsSelf 0` = 0、异 owner = 1。

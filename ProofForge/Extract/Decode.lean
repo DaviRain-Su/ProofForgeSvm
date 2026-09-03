@@ -170,11 +170,53 @@ private partial def asValNamed (env : Environment) (fuel : Nat) (n : Name) (e : 
     match strip e.getAppArgs[e.getAppArgs.size - 1]! with
     | .lit (.strVal s) => some (.sha256Lit s)
     | _ => none
+  else if (endsWith e ".sha256LitWord" || isConstNamed e ``ProofForge.Svm.Runtime.sha256LitWord) &&
+      e.getAppArgs.size ≥ 2 then
+    match strip e.getAppArgs[e.getAppArgs.size - 2]!,
+        asStaticLit env fuel e.getAppArgs[e.getAppArgs.size - 1]! with
+    | .lit (.strVal s), some (.lit word) =>
+      let w := word.toNat
+      if w ≤ 3 then some (.sha256LitWord s w) else none
+    | _, _ => none
   else if (endsWith e ".keccak256Lit" || isConstNamed e ``ProofForge.Svm.Runtime.keccak256Lit) &&
       e.getAppArgs.size ≥ 1 then
     match strip e.getAppArgs[e.getAppArgs.size - 1]! with
     | .lit (.strVal s) => some (.keccak256Lit s)
     | _ => none
+  else if (endsWith e ".keccak256LitWord" || isConstNamed e ``ProofForge.Svm.Runtime.keccak256LitWord) &&
+      e.getAppArgs.size ≥ 2 then
+    match strip e.getAppArgs[e.getAppArgs.size - 2]!,
+        asStaticLit env fuel e.getAppArgs[e.getAppArgs.size - 1]! with
+    | .lit (.strVal s), some (.lit word) =>
+      let w := word.toNat
+      if w ≤ 3 then some (.keccak256LitWord s w) else none
+    | _, _ => none
+  else if (endsWith e ".sha256DataWord" || isConstNamed e ``ProofForge.Svm.Runtime.sha256DataWord) &&
+      e.getAppArgs.size ≥ 4 then
+    match asStaticLit env fuel e.getAppArgs[e.getAppArgs.size - 4]!,
+        asStaticLit env fuel e.getAppArgs[e.getAppArgs.size - 3]!,
+        asStaticLit env fuel e.getAppArgs[e.getAppArgs.size - 2]!,
+        asStaticLit env fuel e.getAppArgs[e.getAppArgs.size - 1]! with
+    | some (.lit acc), some (.lit off), some (.lit len), some (.lit word) =>
+      let a := acc.toNat
+      let w := word.toNat
+      if Svm.Ops.accInRange a && len.toNat ≤ 1024 && w ≤ 3 then
+        some (.sha256DataWord a off.toNat len.toNat w)
+      else none
+    | _, _, _, _ => none
+  else if (endsWith e ".keccak256DataWord" || isConstNamed e ``ProofForge.Svm.Runtime.keccak256DataWord) &&
+      e.getAppArgs.size ≥ 4 then
+    match asStaticLit env fuel e.getAppArgs[e.getAppArgs.size - 4]!,
+        asStaticLit env fuel e.getAppArgs[e.getAppArgs.size - 3]!,
+        asStaticLit env fuel e.getAppArgs[e.getAppArgs.size - 2]!,
+        asStaticLit env fuel e.getAppArgs[e.getAppArgs.size - 1]! with
+    | some (.lit acc), some (.lit off), some (.lit len), some (.lit word) =>
+      let a := acc.toNat
+      let w := word.toNat
+      if Svm.Ops.accInRange a && len.toNat ≤ 1024 && w ≤ 3 then
+        some (.keccak256DataWord a off.toNat len.toNat w)
+      else none
+    | _, _, _, _ => none
   else if (endsWith e ".accKeyWord" || isConstNamed e ``ProofForge.Svm.Runtime.accKeyWord) &&
       e.getAppArgs.size ≥ 2 then
     match asStaticLit env fuel e.getAppArgs[e.getAppArgs.size - 2]!,
@@ -2154,7 +2196,12 @@ private def asOkStateCore (env : Environment) (e : Expr) : Option Ops.Val :=
             | some (.cpiReturn) => some .cpiReturn
             | some (.cpiReturnLen) => some .cpiReturnLen
             | some (.cpiReturnProgramIdWord w) => some (.cpiReturnProgramIdWord w)
-            | some (.signerKey0) => some .signerKey0
+            | some (.sha256Lit s) => some (.sha256Lit s)
+            | some (.sha256LitWord s w) => some (.sha256LitWord s w)
+            | some (.sha256DataWord a o l w) => some (.sha256DataWord a o l w)
+            | some (.keccak256Lit s) => some (.keccak256Lit s)
+            | some (.keccak256LitWord s w) => some (.keccak256LitWord s w)
+            | some (.keccak256DataWord a o l w) => some (.keccak256DataWord a o l w)
             | some (.accLamports0) => some .accLamports0
             | some (.accOwner0) => some .accOwner0
             | some (.accDataLen0) => some .accDataLen0
@@ -2171,8 +2218,6 @@ private def asOkStateCore (env : Environment) (e : Expr) : Option Ops.Val :=
             | some (.findPda s) => some (.findPda s)
             | some (.checkPda s b) => some (.checkPda s b)
             | some (.rentExemption n) => some (.rentExemption n)
-            | some (.sha256Lit s) => some (.sha256Lit s)
-            | some (.keccak256Lit s) => some (.keccak256Lit s)
             | some (.byteSwap64 word) => some (.byteSwap64 word)
             | some (.accKeyWord a w) => some (.accKeyWord a w)
             | some (.accOwnerWord a w) => some (.accOwnerWord a w)
@@ -5174,7 +5219,7 @@ private def decodePlain (env : Environment) (e : Expr) (stateful : Bool)
     | .accLamports1 | .accOwner1 | .accDataLen1
     | .isSigner1 | .isWritable1 | .isExecutable1 | .findPda _
     | .checkPda _ _ | .rentExemption _ | .cpiReturn | .cpiReturnLen | .cpiReturnProgramIdWord _
-    | .sha256Lit _ | .keccak256Lit _
+    | .sha256Lit _ | .sha256LitWord _ _ | .sha256DataWord .. | .keccak256Lit _ | .keccak256LitWord _ _ | .keccak256DataWord ..
     | .byteSwap64 _
     | .accKeyWord _ _ | .accOwnerWord _ _ | .accDataWord _ _ | .accDataWordAt ..
     | .ext (.svm (.component _)) _

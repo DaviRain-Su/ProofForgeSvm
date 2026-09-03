@@ -85,7 +85,11 @@ inductive ValKind where
   | cpiReturnLen
   | cpiReturnProgramIdWord (word : Nat)
   | sha256Lit (seed : String)
+  | sha256LitWord (seed : String) (word : Nat)
+  | sha256DataWord (acc offsetBytes lengthBytes : Nat) (word : Nat)
   | keccak256Lit (seed : String)
+  | keccak256LitWord (seed : String) (word : Nat)
+  | keccak256DataWord (acc offsetBytes lengthBytes : Nat) (word : Nat)
   | accKeyWord (acc word : Nat)
   | accOwnerWord (acc word : Nat)
   | accDataWord (acc word : Nat)
@@ -200,7 +204,13 @@ def cpiReturn : Val := leaf .cpiReturn
 def cpiReturnLen : Val := leaf .cpiReturnLen
 def cpiReturnProgramIdWord (word : Nat) : Val := leaf (.cpiReturnProgramIdWord word)
 def sha256Lit (seed : String) : Val := leaf (.sha256Lit seed)
+def sha256LitWord (seed : String) (word : Nat) : Val := leaf (.sha256LitWord seed word)
+def sha256DataWord (acc offsetBytes lengthBytes : Nat) (word : Nat) : Val :=
+  leaf (.sha256DataWord acc offsetBytes lengthBytes word)
 def keccak256Lit (seed : String) : Val := leaf (.keccak256Lit seed)
+def keccak256LitWord (seed : String) (word : Nat) : Val := leaf (.keccak256LitWord seed word)
+def keccak256DataWord (acc offsetBytes lengthBytes : Nat) (word : Nat) : Val :=
+  leaf (.keccak256DataWord acc offsetBytes lengthBytes word)
 def byteSwap64 (word : Val) : Val := .ext .byteSwap64 #[word]
 def accKeyWord (acc word : Nat) : Val := leaf (.accKeyWord acc word)
 def accOwnerWord (acc word : Nat) : Val := leaf (.accOwnerWord acc word)
@@ -448,6 +458,7 @@ partial def valNeedsWalk : Val → Bool
        | .accLamports1 | .accOwner1 | .accDataLen1
        | .isSigner1 | .isWritable1 | .isExecutable1 => true
        | .accKeyWord acc _ | .accOwnerWord acc _ | .accDataWord acc _
+       | .sha256DataWord acc .. | .keccak256DataWord acc ..
        | .accLamportsN acc | .accDataLenN acc
        | .isSignerN acc | .isWritableN acc | .isExecutableN acc
        | .signerKeyN acc | .ownerIsSelf acc => acc ≥ 1
@@ -474,6 +485,7 @@ partial def valMinAccounts : Val → Nat
         | .accLamports1 | .accOwner1 | .accDataLen1
         | .isSigner1 | .isWritable1 | .isExecutable1 => 2
         | .accKeyWord acc _ | .accOwnerWord acc _ | .accDataWord acc _
+        | .sha256DataWord acc .. | .keccak256DataWord acc ..
         | .accLamportsN acc | .accDataLenN acc
         | .isSignerN acc | .isWritableN acc | .isExecutableN acc
         | .signerKeyN acc | .ownerIsSelf acc => acc + 1

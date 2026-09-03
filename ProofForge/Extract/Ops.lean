@@ -41,7 +41,15 @@ private def svmLeaf (kind : Svm.Ops.ValKind) : Val :=
 @[match_pattern] def Val.cpiReturnProgramIdWord (word : Nat) : Val :=
   svmLeaf (.cpiReturnProgramIdWord word)
 @[match_pattern] def Val.sha256Lit (seed : String) : Val := svmLeaf (.sha256Lit seed)
+@[match_pattern] def Val.sha256LitWord (seed : String) (word : Nat) : Val :=
+  svmLeaf (.sha256LitWord seed word)
+@[match_pattern] def Val.sha256DataWord (acc offsetBytes lengthBytes : Nat) (word : Nat) : Val :=
+  svmLeaf (.sha256DataWord acc offsetBytes lengthBytes word)
 @[match_pattern] def Val.keccak256Lit (seed : String) : Val := svmLeaf (.keccak256Lit seed)
+@[match_pattern] def Val.keccak256LitWord (seed : String) (word : Nat) : Val :=
+  svmLeaf (.keccak256LitWord seed word)
+@[match_pattern] def Val.keccak256DataWord (acc offsetBytes lengthBytes : Nat) (word : Nat) : Val :=
+  svmLeaf (.keccak256DataWord acc offsetBytes lengthBytes word)
 @[match_pattern] def Val.byteSwap64 (word : Val) : Val :=
   .ext (.svm .byteSwap64) #[word]
 @[match_pattern] def Val.accKeyWord (acc word : Nat) : Val := svmLeaf (.accKeyWord acc word)

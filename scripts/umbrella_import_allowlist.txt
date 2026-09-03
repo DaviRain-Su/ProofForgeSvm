@@ -57,6 +57,9 @@ Examples/Svm/TokenMint.lean
 Examples/Svm/TokenMs.lean
 Examples/Svm/TokenNative.lean
 Examples/Svm/TokenOwner.lean
+Examples/Svm/HashWords.lean
+Examples/Svm/HashDataSha.lean
+Examples/Svm/HashDataKeccak.lean
 Examples/Svm/TokenSize.lean
 Examples/Svm/TokenSizeVerified.lean
 Examples/Svm/Token2022SizeVerified.lean

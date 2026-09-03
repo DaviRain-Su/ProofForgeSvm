@@ -969,6 +969,93 @@ private def emitLoadSha256Lit (seed : String) (stackOff : Nat) : String :=
 private def emitLoadKeccak256Lit (seed : String) (stackOff : Nat) : String :=
   emitLoadHashLit "keccak256Lit" "sol_keccak256" seed stackOff
 
+/-- 同一 scratch 布局下取 digest 的第 `word` 个小端 u64。 -/
+private def emitLoadHashLitWord (kind syscall seed : String) (word : Nat) (stackOff : Nat) : String :=
+  let (bytes, _) :=
+    seed.toList.foldl (init := ("", 0)) fun (acc, i) c =>
+      (acc ++ s!"  lddw r1, {c.toNat}\n  stxb [r8 + {i}], r1\n", i + 1)
+  s!"\
+  ; {kind} word={word} seed={seed}
+  mov64 r8, r10
+  add64 r8, -2800
+  lddw r1, 0
+  stxdw [r8 + 0], r1
+  stxdw [r8 + 8], r1
+{bytes}  mov64 r5, r8
+  add64 r5, 16
+  stxdw [r5 + 0], r8
+  lddw r1, {seed.length}
+  stxdw [r5 + 8], r1
+  mov64 r1, r5
+  lddw r2, 1
+  mov64 r3, r8
+  add64 r3, 48
+  call {syscall}
+  ldxdw r1, [r8 + {48 + 8 * word}]
+  stxdw [r10 - {stackOff}], r1
+"
+
+private def emitLoadSha256LitWord (seed : String) (word : Nat) (stackOff : Nat) : String :=
+  emitLoadHashLitWord "sha256LitWord" "sol_sha256" seed word stackOff
+
+private def emitLoadKeccak256LitWord (seed : String) (word : Nat) (stackOff : Nat) : String :=
+  emitLoadHashLitWord "keccak256LitWord" "sol_keccak256" seed word stackOff
+
+
+/-- 账户数据区静态 span 的单切片 hash，取 digest 第 `word` 个小端 u64。
+先按 `offset + length ≤ data_len` 检查，越界 Custom(1)。scratch 同 findPda，用 `r8 = r10-2800`。 -/
+private def emitLoadHashDataWord (kind syscall : String) (acc off len word stackOff : Nat)
+    (scope : String) : String :=
+  let required := off + len
+  let ok := s!"ok_hash_data_{scope}_{acc}_{off}_{len}_{word}_{stackOff}"
+  let ptrSetup :=
+    if acc == 0 then
+      s!"\
+  ldxdw r2, [r6 + ACC0_DATA_LEN]
+  lddw r3, {required}
+  jge r2, r3, {ok}
+  lddw r0, 0x1
+  exit
+{ok}:
+  mov64 r1, r6
+  add64 r1, ACC0_DATA
+"
+    else
+      s!"\
+  ldxdw r1, [r10 - {headerStack acc}]
+  ldxdw r2, [r1 + 80]
+  lddw r3, {required}
+  jge r2, r3, {ok}
+  lddw r0, 0x1
+  exit
+{ok}:
+  add64 r1, 88
+"
+  s!"\
+  ; {kind} acc={acc} off={off} len={len} word={word}
+{ptrSetup}  lddw r2, {off}
+  add64 r1, r2
+  mov64 r8, r10
+  add64 r8, -2800
+  mov64 r5, r8
+  add64 r5, 16
+  stxdw [r5 + 0], r1
+  lddw r1, {len}
+  stxdw [r5 + 8], r1
+  mov64 r1, r5
+  lddw r2, 1
+  mov64 r3, r8
+  add64 r3, 48
+  call {syscall}
+  ldxdw r1, [r8 + {48 + 8 * word}]
+  stxdw [r10 - {stackOff}], r1
+"
+
+private def emitLoadSha256DataWord (acc off len word stackOff : Nat) (scope : String) : String :=
+  emitLoadHashDataWord "sha256DataWord" "sol_sha256" acc off len word stackOff scope
+
+private def emitLoadKeccak256DataWord (acc off len word stackOff : Nat) (scope : String) : String :=
+  emitLoadHashDataWord "keccak256DataWord" "sol_keccak256" acc off len word stackOff scope
 
 set_option maxRecDepth 4096 in
 set_option linter.unusedVariables false in
@@ -1124,8 +1211,16 @@ private partial def loadVal (p : IR.Program) (v : Ops.Val) (stackOff : Nat) (non
     .ok (emitLoadCheckPdaSeeds p account seeds stackOff scope)
   | .ext (.sha256Lit seed) #[] =>
     .ok (emitLoadSha256Lit seed stackOff)
+  | .ext (.sha256LitWord seed word) #[] =>
+    .ok (emitLoadSha256LitWord seed word stackOff)
+  | .ext (.sha256DataWord acc off len word) #[] =>
+    .ok (emitLoadSha256DataWord acc off len word stackOff scope)
   | .ext (.keccak256Lit seed) #[] =>
     .ok (emitLoadKeccak256Lit seed stackOff)
+  | .ext (.keccak256LitWord seed word) #[] =>
+    .ok (emitLoadKeccak256LitWord seed word stackOff)
+  | .ext (.keccak256DataWord acc off len word) #[] =>
+    .ok (emitLoadKeccak256DataWord acc off len word stackOff scope)
   | .ext .byteSwap64 #[word] =>
     emitLoadByteSwap64 p word stackOff nonce scope
   | .ext (.accKeyWord acc word) #[] =>

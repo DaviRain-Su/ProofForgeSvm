@@ -1072,6 +1072,47 @@ or copy account data.
   0
 
 /--
+编译期 ASCII 字面量 SHA-256 digest 的第 `word` 个小端 `u64`（编译期字面量 0..3）。
+抽出器认这个名字，发射 `sol_sha256`。宿主侧是不可约 stub，返回 0。
+-/
+@[irreducible] def sha256LitWord (seed : String) (word : UInt64) : UInt64 :=
+  let _ := seed
+  let _ := word
+  0
+
+/--
+编译期 ASCII 字面量 Keccak-256 digest 的第 `word` 个小端 `u64`（编译期字面量 0..3）。
+抽出器认这个名字，发射 `sol_keccak256`。宿主侧是不可约 stub，返回 0。
+-/
+@[irreducible] def keccak256LitWord (seed : String) (word : UInt64) : UInt64 :=
+  let _ := seed
+  let _ := word
+  0
+
+/--
+账户 `acc` 数据区 `[offsetBytes, offsetBytes + lengthBytes)` 的 SHA-256 digest 第 `word` 个
+小端 `u64`。`acc` / 偏移 / 长度 / `word`（0..3）必须编译期常量；`lengthBytes ≤ 1024`，
+越界读 → Custom(1)。抽出器认这个名字，发射 `sol_sha256`。宿主侧是不可约 stub。
+-/
+@[irreducible] def sha256DataWord (acc offsetBytes lengthBytes word : UInt64) : UInt64 :=
+  let _ := acc
+  let _ := offsetBytes
+  let _ := lengthBytes
+  let _ := word
+  0
+
+/--
+账户 `acc` 数据区 `[offsetBytes, offsetBytes + lengthBytes)` 的 Keccak-256 digest 第 `word`
+个小端 `u64`。约束同 `sha256DataWord`。抽出器认这个名字，发射 `sol_keccak256`。
+-/
+@[irreducible] def keccak256DataWord (acc offsetBytes lengthBytes word : UInt64) : UInt64 :=
+  let _ := acc
+  let _ := offsetBytes
+  let _ := lengthBytes
+  let _ := word
+  0
+
+/--
 账户 `acc` 公钥的第 `word` 个小端 `u64`（`word` 0..=3）。
 `acc` / `word` 必须在抽出时是常量。`acc ≥ 1` 走 walk，不强制入口签名。
 这不是 `signerKey0`：读 key 字不检查 `is_signer`。
