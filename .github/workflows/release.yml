@@ -34,6 +34,7 @@ jobs:
             .lake/packages
           key: toolchains-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json', '.agents/setup') }}
 
+      - name: Prepare pinned toolchains
         run: |
           ./.agents/setup
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
