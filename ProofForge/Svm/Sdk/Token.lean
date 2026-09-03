@@ -412,6 +412,17 @@ extraction-time constant. -/
 @[pf_inline] def mintToChecked (amount decimals : UInt64) : UInt64 :=
   ProofForge.Svm.Runtime.tokenMintToChecked amount decimals
 
+/-- Closed classic Token `TransferChecked` with a multisig authority (this slice pins m = 2):
+external accounts 0 and 1 are the two signers, the multisig authority is account 2; source is
+account 3 (writable), mint account 4 (read-only), destination account 5 (writable). -/
+@[pf_inline] def transferCheckedMs2 (amount decimals : UInt64) : UInt64 :=
+  ProofForge.Svm.Runtime.tokenTransferCheckedMs2 amount decimals
+
+/-- Closed classic Token `ApproveChecked` with a multisig authority (this slice pins m = 2):
+same account geometry as `transferCheckedMs2`, with the delegate at account 5 (read-only). -/
+@[pf_inline] def approveCheckedMs2 (amount decimals : UInt64) : UInt64 :=
+  ProofForge.Svm.Runtime.tokenApproveCheckedMs2 amount decimals
+
 /-- Closed classic Token `BurnChecked`: external account 0 is the signing token owner; source
 is account 1 (writable), mint account 2 (writable). `decimals` must reduce to an
 extraction-time constant. -/

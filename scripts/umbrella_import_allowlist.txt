@@ -54,6 +54,7 @@ Examples/Svm/TokenAuth.lean
 Examples/Svm/TokenFreeze.lean
 Examples/Svm/TokenMint2.lean
 Examples/Svm/TokenMintBurn.lean
+Examples/Svm/TokenMultisig.lean
 Examples/Svm/TokenMint.lean
 Examples/Svm/TokenMs.lean
 Examples/Svm/TokenNative.lean

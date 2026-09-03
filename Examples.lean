@@ -87,6 +87,7 @@ import Examples.Svm.TransientPubkeyBatch
 import Examples.Svm.TransientPubkeyRing
 import Examples.Svm.HashWords
 import Examples.Svm.TokenMintBurn
+import Examples.Svm.TokenMultisig
 import Examples.Svm.HashDataSha
 import Examples.Svm.HashDataKeccak
 import Examples.Svm.TokenSizeVerified

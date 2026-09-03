@@ -612,6 +612,35 @@ def tokenTransferChecked (amount : UInt64) (decimals : UInt64) : UInt64 :=
     #[.u8le 12, .u64le amount, .u8le decimals]
 
 /--
+Token `TransferChecked`（multisig authority，本切片钉死 m=2）。外层 0/1 是两个 signer；
+外层 2 是 multisig authority 账户。内层：source w / mint r / dest w / multisig r /
+signer0 r / signer1 r。callee 是外层账户 6。其余 m fail closed。
+-/
+def tokenTransferCheckedMs2 (amount : UInt64) (decimals : UInt64) : UInt64 :=
+  invoke 6
+    #[{ acc := 3, signer := false, writable := true },
+      { acc := 4, signer := false, writable := false },
+      { acc := 5, signer := false, writable := true },
+      { acc := 2, signer := false, writable := false },
+      { acc := 0, signer := true, writable := false },
+      { acc := 1, signer := true, writable := false }]
+    #[.u8le 12, .u64le amount, .u8le decimals]
+
+/--
+Token `ApproveChecked`（multisig authority，本切片钉死 m=2）。账户布局同上。
+内层：source w / mint r / delegate r / multisig r / signer0 r / signer1 r。callee 是外层账户 6。
+-/
+def tokenApproveCheckedMs2 (amount : UInt64) (decimals : UInt64) : UInt64 :=
+  invoke 6
+    #[{ acc := 3, signer := false, writable := true },
+      { acc := 4, signer := false, writable := false },
+      { acc := 5, signer := false, writable := false },
+      { acc := 2, signer := false, writable := false },
+      { acc := 0, signer := true, writable := false },
+      { acc := 1, signer := true, writable := false }]
+    #[.u8le 13, .u64le amount, .u8le decimals]
+
+/--
 Token-2022 `TransferChecked` for the classic-compatible base slice, guarded by the bounded
 TLV account-data policy. The transaction must place the Token-2022 program at external index 4.
 The official state-with-extensions layout is parsed by a target-local bounded cursor before any

@@ -63,6 +63,7 @@ def entries : Array Entry := #[
   { name := "Nonce", digest := "5746ebbdd382bd56" },
   { name := "TokenOwner", digest := "d29884f00e7311b7" },
   { name := "TokenMs", digest := "672b83a54f057f79" },
+  { name := "TokenMultisig", digest := "a31abd667d925ad9" },
   { name := "TokenStateView", digest := "79e777b300b87504" },
   { name := "SelfLog", digest := "7c000e2c7844d1af" },
   { name := "RawEntry", digest := "8fa216019340cca2" },
