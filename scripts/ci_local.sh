@@ -1,0 +1,183 @@
+#!/usr/bin/env bash
+# Local CI mirror for ProofForge SVM — run the same lane gates *before* pushing.
+#
+# Usage:
+#   scripts/ci_local.sh                  # auto lanes from git diff vs origin/main
+#   scripts/ci_local.sh --fast           # python guards only
+#   scripts/ci_local.sh --lane lean
+#   scripts/ci_local.sh --lane svm
+#   scripts/ci_local.sh --phoenix        # dedicated Phoenix lane (no V1 Surfpool)
+#   scripts/ci_local.sh --phoenix --phoenix-v1-surfpool  # also run ~10MB V1 deploy
+#   scripts/ci_local.sh --all            # every lane including Phoenix
+#   scripts/ci_local.sh --base origin/main
+#
+# Env: CI_LOCAL_BASE, SKIP_SETUP=1, PHOENIX_V1_SURFPOOL=1
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
+
+BASE="${CI_LOCAL_BASE:-origin/main}"
+FAST=0
+ALL=0
+PHOENIX_ONLY=0
+PHOENIX_V1_SURFPOOL="${PHOENIX_V1_SURFPOOL:-0}"
+declare -a LANES=()
+
+usage() { sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'; exit "${1:-0}"; }
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -h|--help) usage 0 ;;
+    --base) BASE="$2"; shift 2 ;;
+    --lane) LANES+=("$2"); shift 2 ;;
+    --all) ALL=1; shift ;;
+    --phoenix) PHOENIX_ONLY=1; shift ;;
+    --phoenix-v1-surfpool) PHOENIX_V1_SURFPOOL=1; shift ;;
+    --fast) FAST=1; shift ;;
+    *) echo "unknown arg: $1" >&2; usage 1 ;;
+  esac
+done
+
+log() { printf '\n==> %s\n' "$*"; }
+have_lane() {
+  local want="$1" lane
+  for lane in "${LANES[@]+"${LANES[@]}"}"; do
+    [[ "$lane" == "$want" ]] && return 0
+  done
+  return 1
+}
+
+matches_any() {
+  local file="$1"; shift
+  local pat
+  for pat in "$@"; do
+    if [[ "$pat" == */** ]]; then
+      local prefix="${pat/%\/**/}"
+      [[ "$file" == "$prefix" || "$file" == "$prefix"/* ]] && return 0
+    else
+      [[ "$file" == "$pat" ]] && return 0
+    fi
+  done
+  return 1
+}
+
+detect_lanes() {
+  git rev-parse --verify "$BASE" >/dev/null 2>&1 || git fetch origin main 2>/dev/null || true
+  local mb
+  mb="$(git merge-base HEAD "$BASE" 2>/dev/null || git rev-parse HEAD)"
+  mapfile -t CHANGED < <({
+    git diff --name-only "$mb" HEAD
+    git diff --name-only --cached
+    git diff --name-only
+  } | awk 'NF && !seen[$0]++')
+
+  if ((${#CHANGED[@]} == 0)); then
+    log "no changed files vs $BASE — defaulting to lean+svm"
+    LANES=(lean svm)
+    return
+  fi
+  printf 'changed files (merge-base %s):\n' "$mb" >&2
+  printf '  %s\n' "${CHANGED[@]}" >&2
+
+  local lean=0 svm=0 phoenix=0 shared=0 f
+  for f in "${CHANGED[@]}"; do
+    matches_any "$f" \
+      '.github/workflows/ci.yml' '.agents/setup' 'lakefile.lean' 'lean-toolchain' 'lake-manifest.json' \
+      'ProofForge/Cli.lean' 'ProofForge/Attr.lean' 'ProofForge/Extract.lean' 'ProofForge/Extract/**' \
+      'ProofForge/Core/**' 'ProofForge/Crypto/**' 'ProofForge/Profile.lean' && shared=1
+    matches_any "$f" \
+      'ProofForge/**' 'Tests/**' 'Tests.lean' 'Examples/**' 'Examples.lean' \
+      'scripts/check_*.py' 'lakefile.lean' 'lean-toolchain' 'lake-manifest.json' \
+      '.github/workflows/ci.yml' '.agents/setup' && lean=1
+    matches_any "$f" \
+      'ProofForge/Svm/**' 'Examples/Svm/**' 'runtime-tests/solana/**' 'runtime-tests/surfpool/**' \
+      'scripts/check_ownership.py' 'scripts/check_no_sorry.py' 'scripts/check_artifact_manifest.py' \
+      'lakefile.lean' 'lean-toolchain' 'lake-manifest.json' '.github/workflows/ci.yml' '.agents/setup' \
+      'ProofForge/Cli.lean' 'ProofForge/Extract.lean' 'ProofForge/Extract/**' 'ProofForge/Core/**' && svm=1
+    matches_any "$f" \
+      'Examples/Svm/Phoenix.lean' 'Examples/Svm/PhoenixV1Layout.lean' 'Examples/Svm/PhoenixV1Profile.lean' \
+      'Tests/PhoenixBuildSpec.lean' 'Tests/PhoenixSpec.lean' 'Tests/PhoenixV1ProfileSpec.lean' \
+      'ProofForge/Svm/AccountStorage/**' 'ProofForge/Svm/FifoCancel/**' 'ProofForge/Svm/BatchRecorder/**' \
+      'ProofForge/Svm/Emit.lean' 'runtime-tests/phoenix/**' 'runtime-tests/solana/tests/common/**' \
+      'runtime-tests/surfpool/**' && phoenix=1
+  done
+  if (( shared )); then lean=1; svm=1; phoenix=1; fi
+  LANES=()
+  (( lean )) && LANES+=(lean)
+  (( svm )) && LANES+=(svm)
+  (( phoenix )) && LANES+=(phoenix)
+  if ((${#LANES[@]} == 0)); then
+    log "docs/website only — running --fast guards"
+    FAST=1
+    LANES=(guards)
+  fi
+}
+
+if (( FAST )); then
+  LANES=(guards)
+elif (( ALL )); then
+  LANES=(lean svm phoenix)
+elif (( PHOENIX_ONLY )) && ((${#LANES[@]} == 0)); then
+  LANES=(phoenix)
+elif ((${#LANES[@]} == 0)); then
+  detect_lanes
+fi
+
+log "lanes: ${LANES[*]-none}  fast=${FAST}"
+
+if [[ "${SKIP_SETUP:-0}" != "1" && "$FAST" != "1" ]]; then
+  if [[ -x .agents/setup ]]; then
+    log "Prepare pinned toolchains (.agents/setup)"
+    ./.agents/setup
+    export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$HOME/.elan/bin:${PATH:-}"
+  fi
+fi
+
+run_guards() {
+  log "Python ownership / SDK / manifest / no-sorry guards"
+  python3 scripts/check_ownership.py
+  python3 scripts/check_sdk_import_closure.py
+  python3 scripts/check_artifact_manifest.py --self-test
+  python3 scripts/check_no_sorry.py
+}
+
+run_lean() {
+  run_guards
+  log "lake build + formalization gates + Tests (no PhoenixTests)"
+  lake build
+  lake build ProofForgeSvmSdk
+  lake build Tests.ProofSpec Tests.SolanalibSpec Tests.SemanticsSpec
+  lake build Tests
+}
+
+run_svm() {
+  log "SVM lane (no Phoenix Mollusk / Surfpool)"
+  lake build Examples
+  lake exe pf -- build --target svm --out build/sbpf
+  python3 scripts/check_artifact_manifest.py --target svm --out build/sbpf
+  cargo test --locked --manifest-path runtime-tests/solana/Cargo.toml
+  runtime-tests/surfpool/smoke.sh RawEntry
+}
+
+run_phoenix() {
+  log "Phoenix dedicated lane (PR mirror: lake + Mollusk + Phoenix Surfpool)"
+  lake build PhoenixExamples PhoenixTests
+  lake exe pf -- build --target svm --module Examples.Svm.Phoenix --module Examples.Svm.PhoenixV1Profile --out build/sbpf
+  cargo test --locked --manifest-path runtime-tests/phoenix/Cargo.toml
+  runtime-tests/surfpool/smoke.sh Phoenix
+  # PhoenixV1Profile Surfpool is nightly-only (ci-phoenix.yml); opt in locally:
+  if [[ "${PHOENIX_V1_SURFPOOL:-}" == "1" ]]; then
+    log "PhoenixV1Profile Surfpool (PHOENIX_V1_SURFPOOL=1)"
+    runtime-tests/surfpool/smoke.sh PhoenixV1Profile
+  fi
+}
+
+if (( FAST )) || have_lane guards; then
+  run_guards
+fi
+have_lane lean && run_lean
+have_lane svm && run_svm
+have_lane phoenix && run_phoenix
+
+log "ci_local: OK (lanes: ${LANES[*]-none})"

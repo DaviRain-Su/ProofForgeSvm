@@ -1,0 +1,150 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$repo_root"
+
+if [[ "$EUID" -eq 0 ]]; then
+  sudo=()
+else
+  sudo=(sudo -n)
+fi
+
+run_timed() {
+  local label="$1"
+  shift
+  local started_at=$SECONDS
+  printf '\n==> %s\n' "$label"
+  "$@"
+  printf '<== %s (%ss)\n' "$label" "$((SECONDS - started_at))"
+}
+
+run_parallel() {
+  local task
+  local -a pids=()
+  local -a labels=()
+  local status=0
+
+  for task in "$@"; do
+    run_timed "${task//_/ }" "$task" &
+    pids+=("$!")
+    labels+=("$task")
+  done
+
+  for task in "${!pids[@]}"; do
+    if ! wait "${pids[$task]}"; then
+      echo "Setup task failed: ${labels[$task]}" >&2
+      status=1
+    fi
+  done
+
+  return "$status"
+}
+
+install_system_packages() {
+packages=(build-essential curl elan jq openssl python3 python3-venv)
+missing_packages=()
+for package in "${packages[@]}"; do
+  if ! dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -Fq "install ok installed"; then
+    missing_packages+=("$package")
+  fi
+done
+if ((${#missing_packages[@]})); then
+  "${sudo[@]}" apt-get update
+  "${sudo[@]}" env DEBIAN_FRONTEND=noninteractive apt-get install -y "${missing_packages[@]}"
+else
+  echo "System packages are already installed."
+fi
+}
+
+configure_tool_paths() {
+mkdir -p "$HOME/.local/bin" "$HOME/.cargo/bin"
+export PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+
+profile_marker="# ProofForge orb toolchains"
+if ! grep -Fqx "$profile_marker" "$HOME/.bash_profile" 2>/dev/null; then
+  cat >>"$HOME/.bash_profile" <<EOF
+
+$profile_marker
+if [[ "\$PWD" == "$repo_root" || "\$PWD" == "$repo_root/"* ]]; then
+  export PATH="\$HOME/.local/bin:\$HOME/.cargo/bin:\$PATH"
+fi
+EOF
+fi
+}
+
+install_lean_stack() {
+lean_toolchain="$(tr -d '[:space:]' <lean-toolchain)"
+if ! elan toolchain list | grep -Fq "$lean_toolchain"; then
+  elan toolchain install "$lean_toolchain"
+else
+  echo "$lean_toolchain is already installed."
+fi
+lake --version
+
+lean_dependency_fingerprint="$(sha256sum lean-toolchain lake-manifest.json | sha256sum | cut -d' ' -f1)"
+lean_dependency_marker=".lake/.proofforge-dependencies"
+if [[ -d .lake/packages/solanalib ]] &&
+    [[ "$(cat "$lean_dependency_marker" 2>/dev/null || true)" == "$lean_dependency_fingerprint" ]]; then
+  echo "Pinned Lean dependencies are already installed."
+else
+  lake update solanalib
+  lean_dependency_fingerprint="$(sha256sum lean-toolchain lake-manifest.json | sha256sum | cut -d' ' -f1)"
+  printf '%s\n' "$lean_dependency_fingerprint" >"$lean_dependency_marker"
+fi
+}
+
+install_rust_stack() {
+rust_toolchain="1.90.0"
+if [[ ! -x "$HOME/.cargo/bin/rustup" ]]; then
+  curl --proto '=https' --tlsv1.2 -fsSL https://sh.rustup.rs |
+    sh -s -- -y --profile minimal --default-toolchain "$rust_toolchain"
+elif ! "$HOME/.cargo/bin/rustup" toolchain list | grep -Eq "^${rust_toolchain}(-|$)"; then
+  "$HOME/.cargo/bin/rustup" toolchain install "$rust_toolchain" --profile minimal
+fi
+rustup default "$rust_toolchain"
+rustc --version
+
+sbpf_revision="d835bc6e638e4f55b88f31a31bbc92e3a2e0a5ba"
+if [[ "$(sbpf --version 2>/dev/null || true)" != "sbpf 0.2.2" ]]; then
+  cargo install \
+    --git https://github.com/blueshift-gg/sbpf.git \
+    --rev "$sbpf_revision" \
+    --locked \
+    --force \
+    sbpf
+else
+  echo "sbpf 0.2.2 is already installed."
+fi
+sbpf --version
+
+cargo fetch --locked --manifest-path runtime-tests/solana/Cargo.toml
+}
+
+install_binary_tools() {
+surfpool_version="1.5.0"
+surfpool_archive="surfpool-linux-x64.tar.gz"
+surfpool_url="https://github.com/solana-foundation/surfpool/releases/download/v${surfpool_version}/${surfpool_archive}"
+surfpool_sha256="5b20a3b46e60c4f819af7b4da5c3ea211f76041710617841cc23247d15887ddc"
+if [[ "$(surfpool --version 2>/dev/null || true)" != "surfpool ${surfpool_version}" ]]; then
+  surfpool_download="$(mktemp)"
+  surfpool_unpack="$(mktemp -d)"
+  trap 'rm -f "$surfpool_download"; rm -rf "$surfpool_unpack"' EXIT
+  curl --proto '=https' --tlsv1.2 -fsSL "$surfpool_url" -o "$surfpool_download"
+  echo "$surfpool_sha256  $surfpool_download" | sha256sum --check --status
+  tar -xzf "$surfpool_download" -C "$surfpool_unpack"
+  install -m 0755 "$surfpool_unpack/surfpool" "$HOME/.local/bin/surfpool"
+  rm -f "$surfpool_download"
+  rm -rf "$surfpool_unpack"
+  trap - EXIT
+else
+  echo "Surfpool $surfpool_version is already installed."
+fi
+surfpool --version
+}
+
+run_timed "Installing required system packages" install_system_packages
+run_timed "Configuring login-shell tool paths" configure_tool_paths
+run_parallel install_lean_stack install_rust_stack install_binary_tools
+
+printf '\nOrb setup complete.\n'

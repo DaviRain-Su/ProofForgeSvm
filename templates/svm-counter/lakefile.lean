@@ -1,0 +1,13 @@
+import Lake
+open Lake DSL
+
+package «my-program» where
+  version := v!"0.1.0"
+
+/-- Path require for monorepo / `pf init` (rewritten by init to the checkout root).
+A published git-tag require is not available yet; do not pretend `v0.0.1` exists.
+Keep imports on `ProofForge.Attr` + `ProofForge.Svm.Sdk` only. -/
+require «proofforge» from ".." / ".."
+
+@[default_target]
+lean_lib «MyProgram»

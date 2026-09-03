@@ -1,0 +1,7 @@
+# 由 `pf init` 生成。发布 tag 尚未提供，`pf init` 会把 Lake path-require 改写到当前 checkout。
+name = "my-program"
+target = "svm"
+
+[[program]]
+name = "Counter"
+module = "MyProgram.Counter"

@@ -1,0 +1,369 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Lean/SVM run on every main push and dispatch, and on PRs whose own or `shared` paths match.
+  # Phoenix runs only on `phoenix`/`phoenix_codegen` paths, a `phoenix` PR label, or dispatch; ci-phoenix.yml covers it nightly.
+  changes:
+    name: Changes
+    runs-on: ubuntu-24.04
+    outputs:
+      lean: ${{ steps.gate.outputs.lean }}
+      svm: ${{ steps.gate.outputs.svm }}
+      phoenix: ${{ steps.gate.outputs.phoenix }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Detect changed paths
+        id: filter
+        if: github.event_name != 'workflow_dispatch'
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            shared:
+              - '.github/workflows/ci.yml'
+              - '.agents/setup'
+              - 'lakefile.lean'
+              - 'lean-toolchain'
+              - 'lake-manifest.json'
+              - 'ProofForge/Cli.lean'
+              - 'ProofForge/Attr.lean'
+              - 'ProofForge/Extract.lean'
+              - 'ProofForge/Extract/**'
+              - 'ProofForge/Core/**'
+              - 'ProofForge/Crypto/**'
+              - 'ProofForge/Profile.lean'
+            lean:
+              - 'ProofForge/**'
+              - 'Tests/**'
+              - 'Tests.lean'
+              - 'Examples/**'
+              - 'Examples.lean'
+              - 'scripts/check_*.py'
+              - 'lakefile.lean'
+              - 'lean-toolchain'
+              - 'lake-manifest.json'
+              - '.github/workflows/ci.yml'
+              - '.agents/setup'
+            svm:
+              - 'ProofForge/Svm/**'
+              - 'Examples/Svm/**'
+              - 'runtime-tests/solana/**'
+              - 'runtime-tests/surfpool/**'
+              - 'scripts/check_ownership.py'
+              - 'scripts/check_no_sorry.py'
+              - 'scripts/check_artifact_manifest.py'
+              - 'lakefile.lean'
+              - 'lean-toolchain'
+              - 'lake-manifest.json'
+              - '.github/workflows/ci.yml'
+              - '.agents/setup'
+              - 'ProofForge/Cli.lean'
+              - 'ProofForge/Extract.lean'
+              - 'ProofForge/Extract/**'
+              - 'ProofForge/Core/**'
+            # Phoenix application surface: examples, spec gates, its own Mollusk crate,
+            # shared test helpers, Surfpool deploy scripts, and the SVM emit paths whose
+            # changes can move Phoenix digests. Drives the dedicated phoenix lane.
+            phoenix:
+              - 'Examples/Svm/Phoenix.lean'
+              - 'Examples/Svm/PhoenixV1Layout.lean'
+              - 'Examples/Svm/PhoenixV1Profile.lean'
+              - 'Tests/PhoenixBuildSpec.lean'
+              - 'Tests/PhoenixSpec.lean'
+              - 'Tests/PhoenixV1ProfileSpec.lean'
+              - 'ProofForge/Svm/AccountStorage/**'
+              - 'ProofForge/Svm/FifoCancel/**'
+              - 'ProofForge/Svm/BatchRecorder/**'
+              - 'ProofForge/Svm/Emit.lean'
+              - 'runtime-tests/phoenix/**'
+              - 'runtime-tests/solana/tests/common/**'
+              - 'runtime-tests/surfpool/**'
+            phoenix_codegen:
+              - 'ProofForge/Extract.lean'
+              - 'ProofForge/Extract/**'
+              - 'ProofForge/Core/**'
+              - 'ProofForge/Svm/Emit.lean'
+              - 'ProofForge/Svm/IR.lean'
+              - 'ProofForge/Svm/Ops.lean'
+              - 'ProofForge/Svm/Component/**'
+              - 'ProofForge/Svm/EntryAdapter/**'
+              - 'ProofForge/Svm/EntryAdapter.lean'
+              - 'lakefile.lean'
+              - 'lean-toolchain'
+              - 'lake-manifest.json'
+
+      - name: Publish lane gates
+        id: gate
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          SHARED: ${{ steps.filter.outputs.shared }}
+          LEAN: ${{ steps.filter.outputs.lean }}
+          SVM: ${{ steps.filter.outputs.svm }}
+          PHOENIX: ${{ steps.filter.outputs.phoenix }}
+          PHOENIX_CODEGEN: ${{ steps.filter.outputs.phoenix_codegen }}
+          PHOENIX_LABEL: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'phoenix') }}
+        run: |
+          set -euo pipefail
+          any_true() {
+            local v
+            for v in "$@"; do
+              if [ "$v" = "true" ]; then
+                echo true
+                return
+              fi
+            done
+            echo false
+          }
+          lane_gates() {
+            local all_lanes=false dispatch=false
+            [ "$EVENT_NAME" = "pull_request" ] || all_lanes=true
+            [ "$EVENT_NAME" != "workflow_dispatch" ] || dispatch=true
+            echo "lean=$(any_true "$all_lanes" "$SHARED" "$LEAN")"
+            echo "svm=$(any_true "$all_lanes" "$SHARED" "$SVM")"
+            echo "phoenix=$(any_true "$dispatch" "$PHOENIX" "$PHOENIX_CODEGEN" "$PHOENIX_LABEL")"
+          }
+          lane_gates | tee -a "$GITHUB_OUTPUT"
+
+  lean:
+    name: Lean
+    needs: changes
+    if: needs.changes.outputs.lean == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Cache toolchains and Lean dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.elan
+            ~/.cargo/bin
+            ~/.cargo/git
+            ~/.cargo/registry
+            ~/.rustup
+            .lake/packages
+          key: toolchains-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json', '.agents/setup') }}
+
+      - name: Prepare pinned toolchains
+        run: |
+          ./.agents/setup
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+
+      - name: Restore Lean build products
+        uses: actions/cache/restore@v4
+        with:
+          path: .lake/build
+          key: lake-build-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json') }}-${{ github.sha }}
+          restore-keys: lake-build-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json') }}-
+
+      - name: Check Runtime / SDK ownership boundaries
+        run: python3 scripts/check_ownership.py
+
+      - name: Check SDK import-closure (no Emit/Assemble/Registry)
+        run: python3 scripts/check_sdk_import_closure.py
+
+      - name: Check artifact manifest
+        run: python3 scripts/check_artifact_manifest.py --self-test
+
+      - name: Check kernel proofs have no placeholders
+        run: python3 scripts/check_no_sorry.py
+
+      - name: Build Lean libraries
+        run: lake build
+
+      - name: Build formalization gate modules
+        run: |
+          lake build ProofForgeSvmSdk
+          lake build Tests.ProofSpec Tests.SolanalibSpec Tests.SemanticsSpec
+
+      - name: Build Lean test suite
+        run: lake build Tests
+
+      # Save only from main so PR runs do not evict the toolchain cache.
+      - name: Save Lean build products
+        if: github.ref == 'refs/heads/main'
+        uses: actions/cache/save@v4
+        with:
+          path: .lake/build
+          key: lake-build-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json') }}-${{ github.sha }}
+
+  svm:
+    name: SVM
+    needs: changes
+    if: needs.changes.outputs.svm == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Cache toolchains and Lean dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.elan
+            ~/.cargo/bin
+            ~/.cargo/git
+            ~/.cargo/registry
+            ~/.rustup
+            .lake/packages
+          key: toolchains-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json', '.agents/setup') }}
+
+      - name: Cache Rust build products
+        uses: actions/cache@v4
+        with:
+          path: runtime-tests/solana/target
+          key: mollusk-${{ runner.os }}-${{ hashFiles('runtime-tests/solana/Cargo.lock', 'runtime-tests/solana/Cargo.toml') }}
+          restore-keys: mollusk-${{ runner.os }}-
+
+      - name: Prepare pinned toolchains
+        run: |
+          ./.agents/setup
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+
+      - name: Restore Lean build products
+        uses: actions/cache/restore@v4
+        with:
+          path: .lake/build
+          key: lake-build-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json') }}-${{ github.sha }}
+          restore-keys: lake-build-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json') }}-
+
+      - name: Check Runtime / SDK ownership boundaries
+        run: python3 scripts/check_ownership.py
+
+      - name: Check kernel proofs have no placeholders
+        run: python3 scripts/check_no_sorry.py
+
+      - name: Build program source modules
+        run: lake build Examples
+
+      - name: Build all SVM programs
+        run: lake exe pf -- build --target svm --out build/sbpf
+
+      - name: Check SVM artifact manifest
+        run: python3 scripts/check_artifact_manifest.py --target svm --out build/sbpf
+
+      - name: Run Mollusk integration suite
+        run: cargo test --locked --manifest-path runtime-tests/solana/Cargo.toml
+
+      - name: Deploy packed entry adapter fixture through Surfpool Loader-v3
+        timeout-minutes: 15
+        run: runtime-tests/surfpool/smoke.sh RawEntry
+
+  phoenix:
+    name: Phoenix
+    needs: changes
+    if: needs.changes.outputs.phoenix == 'true'
+    runs-on: ubuntu-24.04
+    # PR wall budget: Lean + Mollusk + Phoenix Surfpool. PhoenixV1Profile Surfpool
+    # (~10MB ELF) lives in ci-phoenix.yml nightly — it timed out at 45m on PR runners.
+    timeout-minutes: 120
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Cache toolchains and Lean dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.elan
+            ~/.cargo/bin
+            ~/.cargo/git
+            ~/.cargo/registry
+            ~/.rustup
+            .lake/packages
+          key: toolchains-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json', '.agents/setup') }}
+
+      - name: Cache Rust build products
+        uses: actions/cache@v4
+        with:
+          path: runtime-tests/phoenix/target
+          key: mollusk-phoenix-${{ runner.os }}-${{ hashFiles('runtime-tests/phoenix/Cargo.lock', 'runtime-tests/phoenix/Cargo.toml') }}
+          restore-keys: mollusk-phoenix-${{ runner.os }}-
+
+      - name: Prepare pinned toolchains
+        run: |
+          ./.agents/setup
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+
+      - name: Restore Lean build products
+        uses: actions/cache/restore@v4
+        with:
+          path: .lake/build
+          key: lake-build-phoenix-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json') }}-${{ github.sha }}
+          restore-keys: |
+            lake-build-phoenix-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json') }}-
+            lake-build-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json') }}-
+
+      - name: Build Phoenix sources and spec gates
+        run: lake build PhoenixExamples PhoenixTests
+
+      - name: Build Phoenix programs
+        run: lake exe pf -- build --target svm --module Examples.Svm.Phoenix --module Examples.Svm.PhoenixV1Profile --out build/sbpf
+
+      # Save only from main so PR runs do not evict the toolchain cache.
+      - name: Save Lean build products
+        if: github.ref == 'refs/heads/main'
+        uses: actions/cache/save@v4
+        with:
+          path: .lake/build
+          key: lake-build-phoenix-${{ runner.os }}-${{ hashFiles('lean-toolchain', 'lake-manifest.json') }}-${{ github.sha }}
+
+      - name: Run Phoenix Mollusk suite
+        run: cargo test --locked --manifest-path runtime-tests/phoenix/Cargo.toml
+
+      - name: Deploy Phoenix through Surfpool Loader-v3
+        timeout-minutes: 15
+        run: runtime-tests/surfpool/smoke.sh Phoenix
+
+  # Required-check identity. Intentionally-skipped lanes (path filter) count as success;
+  # failed or cancelled lanes still fail the merge gate.
+
+  test:
+    if: always()
+    needs: [changes, lean, svm, phoenix]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require enabled Lean, SVM, and Phoenix lanes
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          LEAN_RESULT: ${{ needs.lean.result }}
+          SVM_RESULT: ${{ needs.svm.result }}
+          PHOENIX_RESULT: ${{ needs.phoenix.result }}
+          LEAN_ENABLED: ${{ needs.changes.outputs.lean }}
+          SVM_ENABLED: ${{ needs.changes.outputs.svm }}
+          PHOENIX_ENABLED: ${{ needs.changes.outputs.phoenix }}
+        run: |
+          set -euo pipefail
+          test "$CHANGES_RESULT" = success
+          require_lane() {
+            local name="$1" enabled="$2" result="$3"
+            if [ "$enabled" != "true" ]; then
+              echo "$name: skipped (paths unchanged)"
+              return 0
+            fi
+            echo "$name: $result"
+            test "$result" = success
+          }
+          require_lane Lean "$LEAN_ENABLED" "$LEAN_RESULT"
+          require_lane SVM "$SVM_ENABLED" "$SVM_RESULT"
+          require_lane Phoenix "$PHOENIX_ENABLED" "$PHOENIX_RESULT"

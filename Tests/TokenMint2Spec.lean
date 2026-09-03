@@ -1,0 +1,30 @@
+import Examples.Svm.TokenMint2
+
+namespace Tests.TokenMint2Spec
+
+open Examples.Svm.TokenMint2
+open ProofForge.Svm.Runtime
+
+#guard (init 0).dummy == 0
+#guard get (init 0) == 0
+#guard tokenInitMint == 0
+
+#guard
+  match openMint (init 0) with
+  | .ok (st, ret) => st.dummy == 0 && ret == 0
+  | .error _ => false
+
+#guard ProofForge.Svm.ABI.usesCpi ProofForge.Golden.extractedTokenMint2
+#guard ProofForge.Svm.ABI.cpiAccountCount ProofForge.Golden.extractedTokenMint2 == 4
+
+#guard
+  match ProofForge.Svm.Emit.emitCounterAsm ProofForge.Golden.extractedTokenMint2 with
+  | .error _ => false
+  | .ok asm =>
+      asm.contains "invoke programIx=3" &&
+        asm.contains "dataLen=35" &&
+        asm.contains "call sol_invoke_signed_c" &&
+        asm.contains "jlt r1, 4" &&
+        asm.contains "call openMint"
+
+end Tests.TokenMint2Spec

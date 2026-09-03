@@ -1,0 +1,30 @@
+import Examples.Svm.TokenNative
+
+namespace Tests.TokenNativeSpec
+
+open Examples.Svm.TokenNative
+open ProofForge.Svm.Runtime
+
+#guard (init 0).dummy == 0
+#guard get (init 0) == 0
+#guard tokenSyncNative == 0
+
+#guard
+  match syncNative (init 0) with
+  | .ok (st, ret) => st.dummy == 0 && ret == 0
+  | .error _ => false
+
+#guard ProofForge.Svm.ABI.usesCpi ProofForge.Golden.extractedTokenNative
+#guard ProofForge.Svm.ABI.cpiAccountCount ProofForge.Golden.extractedTokenNative == 4
+
+#guard
+  match ProofForge.Svm.Emit.emitCounterAsm ProofForge.Golden.extractedTokenNative with
+  | .error _ => false
+  | .ok asm =>
+      asm.contains "invoke programIx=3" &&
+        asm.contains "dataLen=1" &&
+        asm.contains "call sol_invoke_signed_c" &&
+        asm.contains "jlt r1, 4" &&
+        asm.contains "call syncNative"
+
+end Tests.TokenNativeSpec

@@ -1,0 +1,1350 @@
+import ProofForge
+import Examples.Counter
+import Examples.Pair
+import Examples.Flag
+import Examples.Maybe
+import Examples.Window
+import Examples.Phase
+import Examples.Svm.Choice
+import Examples.Svm.Clock
+import Examples.Svm.Transfer
+import Examples.Svm.Ping
+import Examples.Svm.Call
+import Examples.Svm.Info
+import Examples.Svm.Peer
+import Examples.Svm.Pda
+import Examples.Svm.Signed
+import Examples.Svm.Create
+import Examples.Svm.TokenXfer
+import Examples.Svm.Token2022
+import Examples.Svm.Ata
+import Examples.Svm.Rent
+import Examples.Svm.TokenMint
+import Examples.Svm.SysAlloc
+import Examples.Svm.TokenAcc
+import Examples.Svm.Memo
+import Examples.Svm.CreatePda
+import Examples.Svm.TokenApprove
+import Examples.Svm.TokenFreeze
+import Examples.Svm.TokenAuth
+import Examples.Svm.Epoch
+import Examples.Svm.TokenSize
+import Examples.Svm.SysSeed
+import Examples.Svm.SysXfer
+import Examples.Svm.TokenMint2
+import Examples.Svm.TokenNative
+import Examples.Svm.Hash
+import Examples.Svm.Keys
+import Examples.Svm.Keccak
+import Examples.Svm.Trio
+import Examples.Svm.Gate
+import Examples.Svm.Nonce
+import Examples.Svm.TokenOwner
+import Examples.Svm.TokenMs
+import Tests.Fixtures
+
+open Lean Elab Command
+
+#pf_extract Examples.Counter.init Examples.Counter.increment Examples.Counter.get
+
+#pf_extract Examples.Counter.init Examples.Counter.decrement Examples.Counter.get
+
+#pf_extract Examples.Pair.init Examples.Pair.creditLeft Examples.Pair.getLeft
+
+#pf_extract Examples.Pair.init Examples.Pair.creditLeft Examples.Pair.getLeft with "left", "right"
+
+/--
+error: profile/rejected: Nat in root type Tests.Fixtures.usesNat
+-/
+#guard_msgs (error) in
+#pf_extract Tests.Fixtures.usesNat Examples.Counter.increment Examples.Counter.get
+
+/--
+error: extract/unsupported: mutating method missing checked arith
+-/
+#guard_msgs (error) in
+#pf_extract Examples.Counter.init Tests.Fixtures.wrappingAdd Examples.Counter.get
+
+/--
+error: extract/unsupported: mutating method missing checked arith
+-/
+#guard_msgs (error) in
+#pf_extract Examples.Counter.init Tests.Fixtures.wrappingSub Examples.Counter.get
+
+elab "#pf_guard_unknown_cpi_return" : command => do
+  let env ← getEnv
+  match ProofForge.Extract.extractProgram env ``Examples.Counter.init
+      ``Tests.Fixtures.unknownCpiResult ``Examples.Counter.get with
+  | .error reason =>
+      unless reason.contains "unknown CPI return semantics" do
+        throwError s!"unexpected unknown-CPI error: {reason}"
+  | .ok _ => throwError "unknown CPI return semantics were silently accepted"
+
+#pf_guard_unknown_cpi_return
+
+/--
+error: extract/unsupported: field flag enum has payload
+-/
+#guard_msgs (error) in
+#pf_extract Tests.Fixtures.initFlag Tests.Fixtures.creditFlag Tests.Fixtures.getFlagValue
+
+/--
+error: extract/unsupported: fields #[value] != inferred #[left, right]
+-/
+#guard_msgs (error) in
+#pf_extract Examples.Pair.init Examples.Pair.creditLeft Examples.Pair.getLeft with "value"
+
+#pf_extract Examples.Counter.init Examples.Counter.scale Examples.Counter.get
+
+#pf_extract Examples.Counter.init Examples.Counter.divide Examples.Counter.get
+
+#pf_extract Examples.Counter.init Examples.Counter.modulo Examples.Counter.get
+
+#pf_extract Tests.Fixtures.initFold Tests.Fixtures.runFold Tests.Fixtures.foldProduct
+
+elab "#pf_guard_state_fold_ir" : command => do
+  let env ← getEnv
+  let program ←
+    match ProofForge.Extract.extractProgram env ``Tests.Fixtures.initFold
+        ``Tests.Fixtures.runFold ``Tests.Fixtures.foldProduct with
+    | .ok p => pure p
+    | .error reason => throwError reason
+  let some run := program.methods.find? (·.ixName == "runFold")
+    | throwError "missing state-fold method"
+  let expected : Array ProofForge.Ops.Op := #[
+    .forBody 2 #[
+      .ite .eq .loopIx (.lit 0)
+        #[.storeField "product" (.mulU64 (.arg 0) (.arg 1))]
+        #[
+          .storeField "quotient" (.divU64 (.arg 0) (.arg 1)),
+          .storeField "remainder" (.modU64 (.arg 0) (.arg 1))
+        ]
+    ],
+    .okState (.field (.arg 2) "product")
+  ]
+  unless run.ops == expected do
+    throwError s!"state-fold IR mismatch: {repr run.ops}"
+
+#pf_guard_state_fold_ir
+
+elab "#pf_guard_initialized_state_fold_ir" : command => do
+  let env ← getEnv
+  let program ←
+    match ProofForge.Extract.extractProgram env ``Tests.Fixtures.initFold
+        ``Tests.Fixtures.runInitializedFold ``Tests.Fixtures.foldProduct with
+    | .ok p => pure p
+    | .error reason => throwError reason
+  let some run := program.methods.find? (·.ixName == "runInitializedFold")
+    | throwError "missing initialized state-fold method"
+  let expected : Array ProofForge.Ops.Op := #[
+    .storeField "product" (.arg 0),
+    .forBody 1 #[.storeField "remainder" (.arg 0)],
+    .okState (.field (.arg 1) "product")
+  ]
+  unless run.ops == expected do
+    throwError s!"initialized state-fold IR mismatch: {repr run.ops}"
+
+#pf_guard_initialized_state_fold_ir
+
+elab "#pf_guard_invoke_state_fold_ir" : command => do
+  let env ← getEnv
+  let program ←
+    match ProofForge.Extract.extractProgram env ``Tests.Fixtures.initFold
+        ``Tests.Fixtures.runInvokeFold ``Tests.Fixtures.foldProduct with
+    | .ok p => pure p
+    | .error reason => throwError reason
+  let some run := program.methods.find? (·.ixName == "runInvokeFold")
+    | throwError "missing CPI state-fold method"
+  let expected : Array ProofForge.Ops.Op := #[
+    .forBody 2 #[
+      .ite .eq .loopIx (.lit 0)
+        #[
+          .invoke 1 #[] #[.u64le (.arg 0)],
+          .storeField "product" (.arg 0)
+        ] #[]
+    ],
+    .okState (.field (.arg 1) "product")
+  ]
+  unless run.ops == expected do
+    throwError s!"CPI state-fold IR mismatch: {repr run.ops}"
+  let snapshotProgram ←
+    match ProofForge.Extract.extractProgram env ``Tests.Fixtures.initFold
+        ``Tests.Fixtures.runInvokeSnapshot ``Tests.Fixtures.foldProduct with
+    | .ok p => pure p
+    | .error reason => throwError reason
+  let some snapshot := snapshotProgram.methods.find? (·.ixName == "runInvokeSnapshot")
+    | throwError "missing CPI snapshot method"
+  let snapshotExpected : Array ProofForge.Ops.Op := #[
+    .letLocal 0 (.field (.arg 0) "product"),
+    .invoke 1 #[] #[.u64le (.local 0)],
+    .storeField "product" (.lit 0),
+    .okState (.local 0)
+  ]
+  unless snapshot.ops == snapshotExpected do
+    throwError s!"CPI snapshot IR mismatch: {repr snapshot.ops}"
+
+#pf_guard_invoke_state_fold_ir
+
+#guard match Tests.Fixtures.runScalarFrame (Tests.Fixtures.initFold 0) 5 with
+  | .ok (_, result) => result == 7
+  | .error _ => false
+
+#guard match Tests.Fixtures.runScalarFrame (Tests.Fixtures.initFold 0) 11 with
+  | .ok (_, result) => result == 12
+  | .error _ => false
+
+#guard match Tests.Fixtures.runScalarFrameSwap (Tests.Fixtures.initFold 0) 2 7 with
+  | .ok (_, result) => result == 72
+  | .error _ => false
+
+elab "#pf_guard_scalar_frame_ir" : command => do
+  let env ← getEnv
+  let frameProgram ←
+    match ProofForge.Extract.extractProgram env ``Tests.Fixtures.initFold
+        ``Tests.Fixtures.runScalarFrame ``Tests.Fixtures.foldProduct with
+    | .ok p => pure p
+    | .error reason => throwError reason
+  let some frame := frameProgram.methods.find? (·.ixName == "runScalarFrame")
+    | throwError "missing scalar-frame method"
+  let publish3 (ops : Array ProofForge.Ops.Op)
+      (first second third : ProofForge.Ops.Val) : Bool :=
+    ops == #[
+      .letLocal 3 first, .letLocal 4 second, .letLocal 5 third,
+      .setLocal 0 (.local 3), .setLocal 1 (.local 4), .setLocal 2 (.local 5)
+    ]
+  let nextCursor : ProofForge.Ops.Val := .addU64 (.local 0) .loopIx
+  let nextTotal : ProofForge.Ops.Val := .addU64 (.local 2) nextCursor
+  match frame.ops with
+  | #[.letLocal 0 (.lit 0), .letLocal 1 (.lit 0), .letLocal 2 (.arg 0),
+      .forBody 2 #[.ite .eq (.local 1) (.lit 0)
+        #[.ite .gt condition (.lit 10) stopped continued] idle],
+      .okState result] =>
+      unless condition == nextTotal &&
+          publish3 stopped nextCursor (.lit 1) nextTotal &&
+          publish3 continued nextCursor (.local 1) nextTotal &&
+          publish3 idle (.local 0) (.local 1) (.local 2) &&
+          result == .addU64 (.addU64 (.local 2) (.local 0)) (.local 1) do
+        throwError s!"scalar-frame update mismatch: {repr frame.ops}"
+  | _ => throwError s!"scalar-frame IR mismatch: {repr frame.ops}"
+  unless !ProofForge.Ops.hasStoreField frame.ops && !ProofForge.Ops.hasIndexSet frame.ops do
+    throwError "invocation-local frame leaked into persistent state operations"
+
+  let swapProgram ←
+    match ProofForge.Extract.extractProgram env ``Tests.Fixtures.initFold
+        ``Tests.Fixtures.runScalarFrameSwap ``Tests.Fixtures.foldProduct with
+    | .ok p => pure p
+    | .error reason => throwError reason
+  let some swap := swapProgram.methods.find? (·.ixName == "runScalarFrameSwap")
+    | throwError "missing scalar-frame swap method"
+  let swapExpected : Array ProofForge.Ops.Op := #[
+    .letLocal 0 (.arg 0), .letLocal 1 (.arg 1),
+    .forBody 1 #[
+      .letLocal 2 (.local 1), .letLocal 3 (.local 0),
+      .setLocal 0 (.local 2), .setLocal 1 (.local 3)
+    ],
+    .okState (.addU64 (.mulU64 (.local 0) (.lit 10)) (.local 1))
+  ]
+  unless swap.ops == swapExpected do
+    throwError s!"scalar-frame simultaneous update mismatch: {repr swap.ops}"
+
+  let invokeProgram ←
+    match ProofForge.Extract.extractProgram env ``Tests.Fixtures.initFold
+        ``Tests.Fixtures.runInvokeScalarFrame ``Tests.Fixtures.foldProduct with
+    | .ok p => pure p
+    | .error reason => throwError reason
+  let some invoke := invokeProgram.methods.find? (·.ixName == "runInvokeScalarFrame")
+    | throwError "missing effectful scalar-frame method"
+  match invoke.ops with
+  | #[.letLocal 0 (.lit 1), .letLocal 1 (.lit 0), .letLocal 2 (.arg 0),
+      .forBody 2 #[.ite .eq (.local 0) (.lit 1) thn els], .okState _] =>
+      match thn with
+      | #[.invoke 1 #[] #[.u64le (.local 2)],
+          .letLocal 3 (.lit 0), .letLocal 4 cursor, .letLocal 5 total,
+          .setLocal 0 (.local 3), .setLocal 1 (.local 4), .setLocal 2 (.local 5)] =>
+          unless cursor == .addU64 (.local 1) .loopIx &&
+              total == .addU64 (.local 2) cursor &&
+              publish3 els (.local 0) (.local 1) (.local 2) do
+            throwError s!"effectful scalar-frame update mismatch: {repr invoke.ops}"
+      | _ => throwError s!"scalar-frame effect was reordered: {repr invoke.ops}"
+  | _ => throwError s!"effectful scalar-frame IR mismatch: {repr invoke.ops}"
+
+  let readSource ←
+    match ProofForge.Extract.extractProgramIR env ``Tests.Fixtures.initFold
+        ``Tests.Fixtures.runReadScalarFrame ``Tests.Fixtures.foldProduct with
+    | .ok p => pure p
+    | .error reason => throwError reason
+  let readProgram ←
+    match ProofForge.Svm.IR.fromExtracted readSource with
+    | .ok p => pure p
+    | .error reason => throwError reason
+  let some read := readProgram.methods.find? (·.ixName == "runReadScalarFrame")
+    | throwError "missing account-reading scalar-frame method"
+  match read.ops with
+  | #[.letLocal 0 (.lit 0), .letLocal 1 (.arg 0),
+      .forBody 2 #[
+        .letLocal 4 (.ext (.component (.accountStorage (.readWord field))) #[.lit 0]),
+        .letLocal 2 (.local 4),
+        .letLocal 3 (.addU64 (.addU64 (.local 1) (.local 4)) .loopIx),
+        .setLocal 0 (.local 2), .setLocal 1 (.local 3)],
+      .okState (.addU64 (.local 1) (.local 0))] =>
+      unless field.region.account == 1 && field.firstWord == 0 &&
+          field.region.strideWords == 1 && field.region.capacity == 1 &&
+          field.region.indexBase == .zero && !field.region.access.writable do
+        throwError s!"scalar frame lost static account-storage geometry: {repr read.ops}"
+  | _ => throwError s!"account-storage scalar-frame IR mismatch: {repr read.ops}"
+  unless (ProofForge.Svm.Emit.emitAsm readProgram).isOk do
+    throwError "account-storage scalar frame did not reach the SVM emitter"
+
+  let sequentialSource ←
+    match ProofForge.Extract.extractProgramIR env ``Tests.Fixtures.initFold
+        ``Tests.Fixtures.runSequentialWriteScalarFrames ``Tests.Fixtures.foldProduct with
+    | .ok p => pure p
+    | .error reason => throwError reason
+  let sequentialProgram ←
+    match ProofForge.Svm.IR.fromExtracted sequentialSource with
+    | .ok p => pure p
+    | .error reason => throwError reason
+  let some sequential := sequentialProgram.methods.find?
+      (·.ixName == "runSequentialWriteScalarFrames")
+    | throwError "missing sequential scalar-frame method"
+  match sequential.ops with
+  | #[.letLocal 0 (.lit 0), .letLocal 1 (.arg 0),
+      .forBody 1 first,
+      .letLocal 4 (.local 0), .letLocal 5 (.local 1),
+      .forBody 1 #[.component (.accountStorage (.writeWord field (.local 4) (.local 5))),
+        .letLocal 6 (.addU64 (.local 4) (.lit 1)),
+        .letLocal 7 (.addU64 (.local 5) (.lit 1)),
+        .setLocal 4 (.local 6), .setLocal 5 (.local 7)],
+      .okState (.addU64 (.local 4) (.local 5))] =>
+      unless first == #[
+          .letLocal 2 (.addU64 (.local 0) (.lit 1)),
+          .letLocal 3 (.addU64 (.local 1) (.addU64 (.local 0) (.lit 1))),
+          .setLocal 0 (.local 2), .setLocal 1 (.local 3)] &&
+          field.region.account == 1 && field.firstWord == 1 &&
+          field.region.access.writable && field.region.access.currentProgramOwned do
+        throwError s!"sequential scalar-frame composition mismatch: {repr sequential.ops}"
+  | _ => throwError s!"sequential scalar-frame IR mismatch: {repr sequential.ops}"
+  unless (ProofForge.Svm.Emit.emitAsm sequentialProgram).isOk do
+    throwError "sequential component scalar frame did not reach the SVM emitter"
+
+  let svm ←
+    match ProofForge.Svm.Emit.emitCounterAsm frameProgram with
+    | .ok asm => pure asm
+    | .error reason => throwError reason
+  unless !svm.isEmpty do
+    throwError "SVM scalar-frame lowering is missing"
+
+#pf_guard_scalar_frame_ir
+
+elab "#pf_guard_nested_state_loop_control" : command => do
+  let env ← getEnv
+  let program ←
+    match ProofForge.Extract.extractProgram env ``Tests.Fixtures.initGuardedLoop
+        ``Tests.Fixtures.runGuardedLoop ``Tests.Fixtures.guardedLoopSelected with
+    | .ok p => pure p
+    | .error reason => throwError reason
+  let some run := program.methods.find? (·.ixName == "runGuardedLoop")
+    | throwError "missing guarded state-loop method"
+  let rec valIndices (fuel : Nat) (value : ProofForge.Ops.Val) : Array ProofForge.Ops.Val :=
+    match fuel with
+    | 0 => #[]
+    | fuel' + 1 =>
+      match value with
+      | .indexGet base "cells" index _ _ =>
+          #[index] ++ valIndices fuel' base ++ valIndices fuel' index
+      | .field base _ | .bitNot base => valIndices fuel' base
+      | .bitAnd lhs rhs | .bitOr lhs rhs | .bitXor lhs rhs
+      | .shiftL lhs rhs | .shiftR lhs rhs | .addU64 lhs rhs | .subU64 lhs rhs
+      | .mulU64 lhs rhs | .divU64 lhs rhs | .modU64 lhs rhs =>
+          valIndices fuel' lhs ++ valIndices fuel' rhs
+      | .select _ lhs rhs thn els =>
+          valIndices fuel' lhs ++ valIndices fuel' rhs ++
+            valIndices fuel' thn ++ valIndices fuel' els
+      | _ => #[]
+  let rec opIndices (fuel : Nat) (ops : Array ProofForge.Ops.Op) : Array ProofForge.Ops.Val :=
+    match fuel with
+    | 0 => #[]
+    | fuel' + 1 => ops.flatMap fun
+      | .letLocal _ value | .setLocal _ value | .storeField _ value | .okState value
+      | .returnU64 value => valIndices 64 value
+      | .checkedAddU64 lhs rhs | .checkedSubU64 lhs rhs | .checkedMulU64 lhs rhs
+      | .checkedDivU64 lhs rhs | .checkedModU64 lhs rhs =>
+          valIndices 64 lhs ++ valIndices 64 rhs
+      | .indexSet "cells" index value _ _ =>
+          #[index] ++ valIndices 64 value
+      | .ite _ lhs rhs thn els =>
+          valIndices 64 lhs ++ valIndices 64 rhs ++
+            opIndices fuel' thn ++ opIndices fuel' els
+      | .forBody _ body => opIndices fuel' body
+      | _ => #[]
+  match run.ops with
+  | #[.ite .eq (.arg 1) (.lit 0) thn els] =>
+      unless thn == #[.storeField "selected" (.lit 0), .okState (.lit 0)] do
+        throwError s!"zero-quantity branch was not preserved: {repr thn}"
+      unless els.any fun | .forBody 4 _ => true | _ => false do
+        throwError s!"guarded loop was not retained in the else branch: {repr els}"
+  | _ => throwError s!"state loop escaped its source guard: {repr run.ops}"
+  let indices := opIndices 32 run.ops
+  let rec containsLoopIx : ProofForge.Ops.Val → Bool
+    | .loopIx => true
+    | .field base _ | .bitNot base => containsLoopIx base
+    | .indexGet base _ index _ _ => containsLoopIx base || containsLoopIx index
+    | .bitAnd lhs rhs | .bitOr lhs rhs | .bitXor lhs rhs
+    | .shiftL lhs rhs | .shiftR lhs rhs | .addU64 lhs rhs | .subU64 lhs rhs
+    | .mulU64 lhs rhs | .divU64 lhs rhs | .modU64 lhs rhs =>
+        containsLoopIx lhs || containsLoopIx rhs
+    | .select _ lhs rhs thn els =>
+        containsLoopIx lhs || containsLoopIx rhs || containsLoopIx thn || containsLoopIx els
+    | _ => false
+  let rec containsArg : ProofForge.Ops.Val → Bool
+    | .arg _ => true
+    | .field base _ | .bitNot base => containsArg base
+    | .indexGet base _ index _ _ => containsArg base || containsArg index
+    | .bitAnd lhs rhs | .bitOr lhs rhs | .bitXor lhs rhs
+    | .shiftL lhs rhs | .shiftR lhs rhs | .addU64 lhs rhs | .subU64 lhs rhs
+    | .mulU64 lhs rhs | .divU64 lhs rhs | .modU64 lhs rhs =>
+        containsArg lhs || containsArg rhs
+    | .select _ lhs rhs thn els =>
+        containsArg lhs || containsArg rhs || containsArg thn || containsArg els
+    | _ => false
+  unless !indices.isEmpty && indices.all fun index =>
+      containsLoopIx index && !containsArg index do
+    throwError s!"state-loop vector indices escaped callback scope: {repr indices}"
+  let rec containsArgIndex (want : Nat) : ProofForge.Ops.Val → Bool
+    | .arg index => index == want
+    | .field base _ | .bitNot base => containsArgIndex want base
+    | .indexGet base _ index _ _ =>
+        containsArgIndex want base || containsArgIndex want index
+    | .bitAnd lhs rhs | .bitOr lhs rhs | .bitXor lhs rhs
+    | .shiftL lhs rhs | .shiftR lhs rhs | .addU64 lhs rhs | .subU64 lhs rhs
+    | .mulU64 lhs rhs | .divU64 lhs rhs | .modU64 lhs rhs =>
+        containsArgIndex want lhs || containsArgIndex want rhs
+    | .select _ lhs rhs thn els =>
+        containsArgIndex want lhs || containsArgIndex want rhs ||
+          containsArgIndex want thn || containsArgIndex want els
+    | _ => false
+  let rec containsReplacement (fuel : Nat) (ops : Array ProofForge.Ops.Op) : Bool :=
+    match fuel with
+    | 0 => false
+    | fuel' + 1 => ops.any fun
+      | .indexSet "cells" _ value _ _ => containsArgIndex 2 value
+      | .ite _ _ _ thn els =>
+          containsReplacement fuel' thn || containsReplacement fuel' els
+      | .forBody _ body => containsReplacement fuel' body
+      | _ => false
+  unless containsReplacement 32 run.ops do
+    throwError s!"captured replacement parameter was rewritten as a loop binder: {repr run.ops}"
+
+#pf_guard_nested_state_loop_control
+
+elab "#pf_guard_composed_state_fold_ir" : command => do
+  let env ← getEnv
+  let program ←
+    match ProofForge.Extract.extractProgram env ``Tests.Fixtures.initFold
+        ``Tests.Fixtures.runComposedFold ``Tests.Fixtures.foldProduct with
+    | .ok p => pure p
+    | .error reason => throwError reason
+  let some run := program.methods.find? (·.ixName == "runComposedFold")
+    | throwError "missing composed state-fold method"
+  let expected : Array ProofForge.Ops.Op := #[
+    .forBody 1 #[
+      .ite .lt (.arg 0) (.lit 10)
+        #[.storeField "product" (.addU64 (.field (.arg 1) "product") (.arg 0))]
+        #[.storeField "quotient" (.arg 0)],
+      .storeField "remainder" (.arg 0)
+    ],
+    .okState (.field (.arg 1) "product")
+  ]
+  unless run.ops == expected do
+    throwError s!"composed state-fold IR mismatch: {repr run.ops}"
+
+#pf_guard_composed_state_fold_ir
+
+elab "#pf_guard_nested_composed_state_fold_ir" : command => do
+  let env ← getEnv
+  let program ←
+    match ProofForge.Extract.extractProgram env ``Tests.Fixtures.initFold
+        ``Tests.Fixtures.runNestedComposedFold ``Tests.Fixtures.foldProduct with
+    | .ok p => pure p
+    | .error reason => throwError reason
+  let some run := program.methods.find? (·.ixName == "runNestedComposedFold")
+    | throwError "missing nested composed state-fold method"
+  let expected : Array ProofForge.Ops.Op := #[
+    .forBody 1 #[
+      .ite .lt (.arg 0) (.lit 10)
+        #[.storeField "product" (.addU64 (.field (.arg 1) "product") (.arg 0))]
+        #[.storeField "quotient" (.arg 0)],
+      .storeField "remainder" (.arg 0),
+      .ite .lt (.field (.arg 1) "remainder") (.lit 100)
+        #[.storeField "quotient" (.addU64 (.field (.arg 1) "quotient") (.lit 1))]
+        #[]
+    ],
+    .okState (.field (.arg 1) "product")
+  ]
+  unless run.ops == expected do
+    throwError s!"nested composed state-fold IR mismatch: {repr run.ops}"
+
+#pf_guard_nested_composed_state_fold_ir
+
+elab "#pf_guard_post_loop_topology_ir" : command => do
+  let env ← getEnv
+  let program ←
+    match ProofForge.Extract.extractProgram env ``Tests.Fixtures.initPostLoopTopology
+        ``Tests.Fixtures.runPostLoopTopology ``Tests.Fixtures.postLoopTopologyRoot with
+    | .ok p => pure p
+    | .error reason => throwError reason
+  let some run := program.methods.find? (·.ixName == "runPostLoopTopology")
+    | throwError "missing post-loop topology method"
+  let rec summarize (fuel : Nat) (ops : Array ProofForge.Ops.Op) :
+      Bool × Bool × Bool × Bool :=
+    match fuel with
+    | 0 => (false, false, false, false)
+    | fuel' + 1 => ops.foldl (init := (false, false, false, false)) fun found op =>
+      let current := match op with
+        | .forBody 1 _ => (true, false, false, false)
+        | .storeField "count" _ => (false, true, false, false)
+        | .storeField "root" _ => (false, false, true, false)
+        | .indexSet "nodes" _ _ _ _ => (false, false, false, true)
+        | .ite _ _ _ thn els =>
+          let left := summarize fuel' thn
+          let right := summarize fuel' els
+          (left.1 || right.1, left.2.1 || right.2.1,
+            left.2.2.1 || right.2.2.1, left.2.2.2 || right.2.2.2)
+        | _ => (false, false, false, false)
+      (found.1 || current.1, found.2.1 || current.2.1,
+        found.2.2.1 || current.2.2.1, found.2.2.2 || current.2.2.2)
+  let summary := summarize 32 run.ops
+  unless summary.1 && summary.2.1 && summary.2.2.1 && summary.2.2.2 do
+    throwError s!"post-loop topology continuation lost writes: {repr run.ops}"
+
+#pf_guard_post_loop_topology_ir
+
+elab "#pf_guard_checked_state_snapshot_ir" : command => do
+  let env ← getEnv
+  let program ←
+    match ProofForge.Extract.extractProgram env ``Tests.Fixtures.initSnapshot
+        ``Tests.Fixtures.collectSnapshot ``Tests.Fixtures.snapshotTotal with
+    | .ok p => pure p
+    | .error reason => throwError reason
+  let some collect := program.methods.find? (·.ixName == "collectSnapshot")
+    | throwError "missing checked state snapshot method"
+  let expected : Array ProofForge.Ops.Op := #[
+    .checkedAddU64 (.field (.arg 0) "total") (.field (.arg 0) "pending"),
+    .letLocal 0 (.field (.arg 0) "pending"),
+    .storeField "total" (.addU64 (.field (.arg 0) "total") (.local 0)),
+    .storeField "pending" (.lit 0),
+    .storeField "last" (.local 0),
+    .okState (.local 0)
+  ]
+  unless collect.ops == expected do
+    throwError s!"checked state snapshot IR mismatch: {repr collect.ops}"
+
+#pf_guard_checked_state_snapshot_ir
+
+elab "#pf_guard_projected_ledger_scalars" : command => do
+  let env ← getEnv
+  let program ←
+    match ProofForge.Extract.extractProgram env ``Tests.Fixtures.initLedger
+        ``Tests.Fixtures.postLedger ``Tests.Fixtures.ledgerLocked with
+    | .ok p => pure p
+    | .error reason => throwError reason
+  let some post := program.methods.find? (·.ixName == "postLedger")
+    | throwError "missing projected ledger method"
+  let rec hasStore (fuel : Nat) (field : String) (ops : Array ProofForge.Ops.Op) : Bool :=
+    match fuel with
+    | 0 => false
+    | fuel' + 1 => ops.any fun
+      | .storeField name _ => name == field
+      | .ite _ _ _ thn els => hasStore fuel' field thn || hasStore fuel' field els
+      | .forBody _ body => hasStore fuel' field body
+      | _ => false
+  let rec hasIndex (fuel : Nat) (field : String) (ops : Array ProofForge.Ops.Op) : Bool :=
+    match fuel with
+    | 0 => false
+    | fuel' + 1 => ops.any fun
+      | .indexSet name _ _ _ _ => name == field
+      | .ite _ _ _ thn els => hasIndex fuel' field thn || hasIndex fuel' field els
+      | .forBody _ body => hasIndex fuel' field body
+      | _ => false
+  unless hasStore 8 "locked" post.ops && hasStore 8 "free" post.ops do
+    throwError s!"projected ledger continuation dropped aggregate stores: {repr post.ops}"
+
+#pf_guard_projected_ledger_scalars
+
+elab "#pf_guard_dynamic_write_return" : command => do
+  let env ← getEnv
+  let program ←
+    match ProofForge.Extract.extractProgram env ``Tests.Fixtures.initMarketEventBatch
+        ``Tests.Fixtures.setMarketEventReturningIndex
+        ``Tests.Fixtures.firstMarketEventValue with
+    | .ok p => pure p
+    | .error reason => throwError reason
+  let some setEvent := program.methods.find? (·.ixName == "setMarketEventReturningIndex")
+    | throwError "missing dynamic-write return fixture"
+  let rec terminalReturns (fuel : Nat) (ops : Array ProofForge.Ops.Op) :
+      Array ProofForge.Ops.Val :=
+    match fuel with
+    | 0 => #[]
+    | fuel' + 1 =>
+      ops.flatMap fun
+        | .okState value => #[value]
+        | .ite _ _ _ thn els => terminalReturns fuel' thn ++ terminalReturns fuel' els
+        | .forBody _ body => terminalReturns fuel' body
+        | _ => #[]
+  unless terminalReturns 8 setEvent.ops == #[.arg 0] do
+    throwError s!"dynamic vector write lost its explicit return: {repr setEvent.ops}"
+
+#pf_guard_dynamic_write_return
+
+elab "#pf_guard_inline_state_dynamic_write" : command => do
+  let env ← getEnv
+  let program ←
+    match ProofForge.Extract.extractProgram env ``Tests.Fixtures.initMarketEventBatch
+        ``Tests.Fixtures.appendMarketEventInFold
+        ``Tests.Fixtures.firstMarketEventValue with
+    | .ok p => pure p
+    | .error reason => throwError reason
+  let some append := program.methods.find? (·.ixName == "appendMarketEventInFold")
+    | throwError "missing inline State dynamic-write fixture"
+  let rec collectWrites (fuel : Nat) (ops : Array ProofForge.Ops.Op) :
+      Array (String × Nat) × Array String :=
+    match fuel with
+    | 0 => (#[], #[])
+    | fuel' + 1 => Id.run do
+      let mut dynamic := #[]
+      let mut static := #[]
+      for op in ops do
+        match op with
+        | .indexSet name _ _ _ offset => dynamic := dynamic.push (name, offset)
+        | .storeField name _ => static := static.push name
+        | .ite _ _ _ thn els =>
+          let thenWrites := collectWrites fuel' thn
+          let elseWrites := collectWrites fuel' els
+          dynamic := dynamic ++ thenWrites.1 ++ elseWrites.1
+          static := static ++ thenWrites.2 ++ elseWrites.2
+        | .forBody _ body =>
+          let bodyWrites := collectWrites fuel' body
+          dynamic := dynamic ++ bodyWrites.1
+          static := static ++ bodyWrites.2
+        | _ => pure ()
+      return (dynamic, static)
+  let writes := collectWrites 16 append.ops
+  unless [0, 8, 16, 24, 32, 40].all fun offset =>
+      writes.1.contains ("events", offset) do
+    throwError s!"inline State helper lost variant-vector leaves: {writes.1}"
+  let rec hasSelect : Nat → ProofForge.Ops.Val → Bool
+    | 0, _ => false
+    | _ + 1, .select _ _ _ _ _ => true
+    | fuel + 1, .field base _ => hasSelect fuel base
+    | fuel + 1, .indexGet base _ index _ _ =>
+      hasSelect fuel base || hasSelect fuel index
+    | _ + 1, _ => false
+  let rec containsInlineScalar (fuel : Nat) (ops : Array ProofForge.Ops.Op) : Bool :=
+    match fuel with
+    | 0 => false
+    | fuel' + 1 => ops.any fun
+      | .indexSet "events" _ value _ 8 => hasSelect 16 value
+      | .ite _ _ _ thn els =>
+        containsInlineScalar fuel' thn || containsInlineScalar fuel' els
+      | .forBody _ body => containsInlineScalar fuel' body
+      | _ => false
+  unless containsInlineScalar 16 append.ops do
+    throwError "pf_inline scalar event payload was not normalized"
+  let rec containsProjectedUpdate (fuel : Nat) (ops : Array ProofForge.Ops.Op) : Bool :=
+    match fuel with
+    | 0 => false
+    | fuel' + 1 => ops.any fun
+      | .indexSet "events" _ (.addU64 _ (.lit 1)) _ 16 => true
+      | .ite _ _ _ thn els =>
+        containsProjectedUpdate fuel' thn || containsProjectedUpdate fuel' els
+      | .forBody _ body => containsProjectedUpdate fuel' body
+      | _ => false
+  unless containsProjectedUpdate 16 append.ops do
+    throwError "updated-record scalar projection was not normalized"
+  unless writes.2.contains "eventCount" do
+    throwError s!"inline State helper lost scalar update: {writes.2}"
+  unless ["lastEvent_tag", "lastEvent_p0", "lastEvent_p1", "lastEvent_p2",
+      "lastEvent_p3", "lastEvent_p4"].all writes.2.contains do
+    throwError s!"inline State helper lost static variant leaves: {writes.2}"
+  let svm ←
+    match ProofForge.Svm.Emit.emitCounterAsm program with
+    | .ok asm => pure asm
+    | .error reason => throwError reason
+  unless svm.contains "; indexSet events[4]+40" do
+    throwError "inline State dynamic variant writes did not reach SVM"
+
+#pf_guard_inline_state_dynamic_write
+
+elab "#pf_guard_schema_driven_vector_layout" : command => do
+  let env ← getEnv
+  let program ←
+    match ProofForge.Extract.extractProgramIR env ``Tests.Fixtures.initLayout
+        ``Tests.Fixtures.setLayout ``Tests.Fixtures.getLayout with
+    | .ok p => pure p
+    | .error reason =>
+      let methodError (kind : ProofForge.Core.IR.MethodKind) (name : Name) : String :=
+        match ProofForge.Extract.extractMethod env kind name with
+        | .ok _ => "ok"
+        | .error detail => detail
+      throwError s!"{reason}; init={methodError .init ``Tests.Fixtures.initLayout}; " ++
+        s!"set={methodError .increment ``Tests.Fixtures.setLayout}; " ++
+        s!"get={methodError .get ``Tests.Fixtures.getLayout}"
+  let some vector := program.schema.vector? "entries"
+    | throwError "layout fixture has no entries vector"
+  let names := program.schema.vectorElementLeaves vector |>.map (vector.relativeLeafName ·)
+  unless vector.elementBytes == 24 && names == #["marker", "left", "color"] do
+    throwError s!"unexpected logical vector layout: {repr program.schema}"
+  let some setter := program.methods.find? (·.ixName == "setLayout")
+    | throwError "missing layout setter"
+  let some getter := program.methods.find? (·.ixName == "getLayout")
+    | throwError "missing layout getter"
+  let rec containsWrite (fuel offset : Nat)
+      (ops : Array ProofForge.Extract.IR.Op) : Bool :=
+    match fuel with
+    | 0 => false
+    | fuel' + 1 => ops.any fun
+        | .indexSet "entries" _ _ 2 actual => actual == offset
+        | .ite _ _ _ thn els =>
+            containsWrite fuel' offset thn || containsWrite fuel' offset els
+        | .forBody _ body => containsWrite fuel' offset body
+        | _ => false
+  let rec containsRead (offset : Nat) : ProofForge.Extract.IR.Val → Bool
+    | .indexGet _ "entries" _ _ actual => actual == offset
+    | .field base _ | .bitNot base => containsRead offset base
+    | .select _ lhs rhs thn els =>
+        containsRead offset lhs || containsRead offset rhs ||
+          containsRead offset thn || containsRead offset els
+    | _ => false
+  let rec opsContainRead (fuel offset : Nat)
+      (ops : Array ProofForge.Extract.IR.Op) : Bool :=
+    match fuel with
+    | 0 => false
+    | fuel' + 1 => ops.any fun
+        | .letLocal _ value | .setLocal _ value | .returnU64 value =>
+            containsRead offset value
+        | .ite _ lhs rhs thn els =>
+            containsRead offset lhs || containsRead offset rhs ||
+              opsContainRead fuel' offset thn || opsContainRead fuel' offset els
+        | .forBody _ body => opsContainRead fuel' offset body
+        | _ => false
+  let getterReads := opsContainRead 8 8 getter.ops
+  let svm ←
+    match ProofForge.Svm.IR.fromExtracted program with
+    | .ok lowered => pure lowered
+    | .error reason => throwError reason
+  unless containsWrite 8 8 setter.ops && containsWrite 8 16 setter.ops && getterReads do
+    let some svmGetter := svm.methods.find? (·.ixName == "getLayout")
+      | throwError "lowered SVM program has no layout getter"
+    throwError s!"schema offsets did not replace field-name guesses: " ++
+      s!"write8={containsWrite 8 8 setter.ops}, write16={containsWrite 8 16 setter.ops}, " ++
+      s!"read0={opsContainRead 8 0 getter.ops}, read8={getterReads}, " ++
+      s!"read16={opsContainRead 8 16 getter.ops}; ops={repr svmGetter.ops}"
+  let svmAsm ←
+    match ProofForge.Svm.Emit.emitAsm svm with
+    | .ok asm => pure asm
+    | .error reason => throwError reason
+  unless !svmAsm.isEmpty do
+    throwError "schema-driven vector layout did not reach SVM emitter"
+
+#pf_guard_schema_driven_vector_layout
+
+elab "#pf_guard_nested_vector_path" : command => do
+  let env ← getEnv
+  let program ←
+    match ProofForge.Extract.extractProgramIR env ``Tests.Fixtures.initNestedVector
+        ``Tests.Fixtures.setNestedVector ``Tests.Fixtures.getNestedVector with
+    | .ok p => pure p
+    | .error reason => throwError reason
+  let some vector := program.schema.vector? "book_right"
+    | throwError s!"nested vector lost its qualified schema path: {repr program.schema}"
+  unless vector.length == 2 && vector.elementBytes == 8 do
+    throwError s!"unexpected nested vector layout: {repr vector}"
+  let some setter := program.methods.find? (·.ixName == "setNestedVector")
+    | throwError "missing nested-vector setter"
+  let some getter := program.methods.find? (·.ixName == "getNestedVector")
+    | throwError "missing nested-vector getter"
+  let setterWrites := setter.ops.any fun
+    | .ite _ _ _ thn els => (thn ++ els).any fun
+        | .indexSet "book_right" _ _ 2 0 => true
+        | _ => false
+    | .indexSet "book_right" _ _ 2 0 => true
+    | _ => false
+  let rec readsNested : ProofForge.Extract.IR.Val → Bool
+    | .indexGet _ "book_right" _ _ 0 => true
+    | .field base _ | .bitNot base => readsNested base
+    | .bitAnd lhs rhs | .bitOr lhs rhs | .bitXor lhs rhs |
+        .shiftL lhs rhs | .shiftR lhs rhs | .addU64 lhs rhs |
+        .subU64 lhs rhs | .mulU64 lhs rhs | .divU64 lhs rhs | .modU64 lhs rhs =>
+        readsNested lhs || readsNested rhs
+    | .select _ lhs rhs thn els =>
+        readsNested lhs || readsNested rhs || readsNested thn || readsNested els
+    | _ => false
+  let rec opsRead (fuel : Nat) (ops : Array ProofForge.Extract.IR.Op) : Bool :=
+    match fuel with
+    | 0 => false
+    | fuel' + 1 => ops.any fun
+      | .letLocal _ value | .setLocal _ value | .returnU64 value => readsNested value
+      | .ite _ lhs rhs thn els =>
+          readsNested lhs || readsNested rhs || opsRead fuel' thn || opsRead fuel' els
+      | .forBody _ body => opsRead fuel' body
+      | _ => false
+  let getterReads := opsRead 8 getter.ops
+  unless setterWrites && getterReads do
+    throwError s!"nested vector path did not reach dynamic IR: " ++
+      s!"setter={setterWrites}, getter={getterReads}"
+  let svm ←
+    match ProofForge.Svm.IR.fromExtracted program with
+    | .ok lowered => pure lowered
+    | .error reason => throwError reason
+  let svmAsm ←
+    match ProofForge.Svm.Emit.emitAsm svm with
+    | .ok asm => pure asm
+    | .error reason => throwError reason
+  unless !svmAsm.isEmpty do
+    throwError "nested vector path did not reach SVM emitter"
+
+#pf_guard_nested_vector_path
+
+elab "#pf_guard_staged_nested_transition" : command => do
+  let env ← getEnv
+  let program ←
+    match ProofForge.Extract.extractProgramIR env ``Tests.Fixtures.initNestedVector
+        ``Tests.Fixtures.setStagedNestedVector ``Tests.Fixtures.getNestedVector with
+    | .ok p => pure p
+    | .error reason => throwError reason
+  let svm ←
+    match ProofForge.Svm.IR.fromExtracted program with
+    | .ok lowered => pure lowered
+    | .error reason => throwError reason
+  let some svmSetter := svm.methods.find? (·.ixName == "setStagedNestedVector")
+    | throwError "missing lowered staged nested-vector setter"
+  let rec writtenNames (fuel : Nat) (ops : Array ProofForge.Svm.IR.Op) : Array String :=
+    match fuel with
+    | 0 => #[]
+    | fuel' + 1 => ops.flatMap fun
+      | .storeField name _ | .indexSet name _ _ _ _ => #[name]
+      | .ite _ _ _ thn els => writtenNames fuel' thn ++ writtenNames fuel' els
+      | .forBody _ body => writtenNames fuel' body
+      | _ => #[]
+  let names := writtenNames 32 svmSetter.ops
+  let tag? := names.findIdx? (· == "tag")
+  let root? := names.findIdx? (· == "book_root")
+  let right? := names.findIdx? (· == "book_right")
+  unless (names.filter (· == "tag")).size == 1 &&
+      (names.filter (· == "book_root")).size == 1 &&
+      (names.filter (· == "book_right")).size == 1 do
+    throwError s!"staged nested writes were missing or duplicated: {names}; {repr svmSetter.ops}"
+  match tag?, root?, right? with
+  | some tag, some root, some right =>
+      unless tag < root && tag < right do
+        throwError s!"outer transition did not precede nested writes: {names}"
+  | _, _, _ => throwError s!"staged nested transition lost a write: {names}"
+  unless !names.contains "book" && !names.contains "root" && !names.contains "right" &&
+      !names.contains "book_tag" do
+    throwError s!"staged nested transition leaked an untyped field name: {names}"
+  unless (ProofForge.Svm.Emit.emitAsm svm).isOk do
+    throwError "staged nested transition did not reach SVM emitter"
+
+#pf_guard_staged_nested_transition
+
+elab "#pf_guard_conditional_local" : command => do
+  let env ← getEnv
+  let program ←
+    match ProofForge.Extract.extractProgram env ``Tests.Fixtures.initChoice
+        ``Tests.Fixtures.choose ``Tests.Fixtures.getChosen with
+    | .ok p => pure p
+    | .error reason => throwError reason
+  let some choose := program.methods.find? (·.ixName == "choose")
+    | throwError "missing conditional-local method"
+  let expected : Array ProofForge.Ops.Op := #[
+    .letLocal 0 (.select .lt (.arg 0) (.arg 1) (.arg 0) (.arg 1)),
+    .okState (.local 0)
+  ]
+  unless choose.ops == expected do
+    throwError s!"conditional-local IR mismatch: {repr choose.ops}"
+  let svm ←
+    match ProofForge.Svm.Emit.emitCounterAsm program with
+    | .ok asm => pure asm
+    | .error reason => throwError reason
+  unless svm.contains "then_select_" && svm.contains "load local 0" do
+    throwError "SVM conditional-local lowering is missing"
+
+#pf_guard_conditional_local
+
+elab "#pf_guard_scalar_loop_helper_join" : command => do
+  let env ← getEnv
+  let method ←
+    match ProofForge.Extract.extractMethod env .get ``Tests.Fixtures.hasBoundedLoopPosition with
+    | .ok method => pure method
+    | .error reason => throwError reason
+  unless method.ops.any (· matches .joinLocal 0) &&
+      method.ops.any (fun op => match op with | .forBody 3 _ => true | _ => false) &&
+      method.ops.any (fun op => match op with | .returnU64 (.select .ne (.local 0) (.lit 0) ..) => true | _ => false) do
+    throwError "scalar loop helper was not joined before caller control"
+
+#pf_guard_scalar_loop_helper_join
+
+elab "#pf_guard_except_bind_join" : command => do
+  let env ← getEnv
+  let program ←
+    match ProofForge.Extract.extractProgram env ``Tests.Fixtures.initChoice
+        ``Tests.Fixtures.bindChoice ``Tests.Fixtures.getChosen with
+    | .ok p => pure p
+    | .error reason => throwError reason
+  let some bindChoice := program.methods.find? (·.ixName == "bindChoice")
+    | throwError "missing bind-join method"
+  let expected : Array ProofForge.Ops.Op := #[
+    .joinLocal 0,
+    .ite .lt (.arg 0) (.arg 2)
+      #[.setLocal 0 (.arg 0)]
+      #[.ite .lt (.arg 1) (.arg 2)
+          #[.setLocal 0 (.arg 1)]
+          #[.errorOverflow]],
+    .checkedAddU64 (.local 0) (.arg 3),
+    .okState (.addU64 (.local 0) (.arg 3)),
+    .errorOverflow
+  ]
+  unless bindChoice.ops == expected do
+    throwError s!"Except.bind join IR mismatch: {repr bindChoice.ops}"
+  let svm ←
+    match ProofForge.Svm.Emit.emitCounterAsm program with
+    | .ok asm => pure asm
+    | .error reason => throwError reason
+  unless svm.contains "; declare join local 0" &&
+      svm.contains "; set join local 0" && svm.contains "; load local 0" do
+    throwError "SVM Except.bind join lowering is missing"
+  unless svm.contains "cfg_bindChoice_block_" &&
+      svm.contains "ja cfg_bindChoice_block_" && !svm.contains "@@CFG_EDGE_" do
+    throwError "SVM successful Except.bind branch falls through into its else branch"
+
+#pf_guard_except_bind_join
+
+elab "#pf_guard_compound_error_guard" : command => do
+  let env ← getEnv
+  let program ←
+    match ProofForge.Extract.extractProgram env ``Tests.Fixtures.initChoice
+        ``Tests.Fixtures.compoundChoice ``Tests.Fixtures.getChosen with
+    | .ok p => pure p
+    | .error reason => throwError reason
+  let some compound := program.methods.find? (·.ixName == "compoundChoice")
+    | throwError "missing compound-guard method"
+  let rec comparisonLeaves (fuel : Nat) (value : ProofForge.Ops.Val) : Nat :=
+    match fuel with
+    | 0 => 0
+    | fuel' + 1 =>
+      match value with
+      | .bitAnd lhs rhs => comparisonLeaves fuel' lhs + comparisonLeaves fuel' rhs
+      | .select _ _ _ _ _ => 1
+      | _ => 0
+  match compound.ops with
+  | #[.ite .ne condition (.lit 0)
+        #[.storeField "chosen" (.arg 0), .okState (.arg 0)] #[.errorOverflow]] =>
+      unless comparisonLeaves 8 condition == 4 do
+        throwError s!"compound guard lost comparisons: {repr compound.ops}"
+  | #[.ite .eq condition (.lit 1)
+        #[.storeField "chosen" (.arg 0), .okState (.arg 0)] #[.errorOverflow]] =>
+      unless comparisonLeaves 8 condition == 4 do
+        throwError s!"compound guard lost comparisons: {repr compound.ops}"
+  | _ => throwError s!"compound error-guard IR mismatch: {repr compound.ops}"
+
+#pf_guard_compound_error_guard
+
+elab "#pf_guard_multi_seed_invoke_sequence" : command => do
+  let env ← getEnv
+  let program ←
+    match ProofForge.Extract.extractProgramIR env ``Examples.Counter.init
+        ``Tests.Fixtures.multiSeedTransfer ``Examples.Counter.get with
+    | .ok p => pure p
+    | .error reason => throwError reason
+  let lowered ←
+    match ProofForge.Svm.IR.fromExtracted program with
+    | .ok p => pure p
+    | .error reason => throwError reason
+  let some transfer := lowered.methods.find? (·.ixName == "multiSeedTransfer")
+    | throwError "missing multi-seed transfer method"
+  let expectedSeeds : Array ProofForge.Svm.Ops.PdaSeed :=
+    #[.ascii "vault", .stateKey, .accKey 3]
+  match transfer.ops with
+  | #[.invoke 8 firstMetas
+          #[.u8le (.lit 12), .u64le (.arg 0), .u8le (.lit 6)] #[] none,
+      .invoke 8 secondMetas
+          #[.u8le (.lit 12), .u64le (.arg 0), .u8le (.lit 6)] seeds
+          (some (.ext (.findPdaSeeds bumpSeeds) #[])),
+      .storeField "value" (.arg 0), .okState (.arg 0)] =>
+        let expectedFirst : Array ProofForge.Svm.Ops.CpiMeta :=
+          #[{ acc := 1, signer := false, writable := true },
+            { acc := 3, signer := false, writable := false },
+            { acc := 5, signer := false, writable := true },
+            { acc := 0, signer := true, writable := false }]
+        let expectedSecond : Array ProofForge.Svm.Ops.CpiMeta :=
+          #[{ acc := 5, signer := false, writable := true },
+            { acc := 3, signer := false, writable := false },
+            { acc := 1, signer := false, writable := true },
+            { acc := 7, signer := true, writable := false }]
+        unless firstMetas == expectedFirst && secondMetas == expectedSecond &&
+            seeds == expectedSeeds && bumpSeeds == expectedSeeds do
+          throwError s!"multi-seed list mismatch: {repr transfer.ops}"
+  | _ => throwError s!"multi-invoke sequence IR mismatch: {repr transfer.ops}"
+  unless ProofForge.Svm.IR.cpiAccountCount lowered == 10 do
+    throwError s!"multi-seed account scan stopped at {ProofForge.Svm.IR.cpiAccountCount lowered}"
+  let asm ←
+    match ProofForge.Svm.Emit.emitProgramAsm program with
+    | .ok asm => pure asm
+    | .error reason => throwError reason
+  unless asm.contains "; findPdaSeeds count=3" &&
+      (asm.splitOn "; invoke programIx=9").length == 3 do
+    throwError "multi-seed discovery or consecutive CPI emission is missing"
+
+#pf_guard_multi_seed_invoke_sequence
+
+elab "#pf_guard_single_invoke_continuation" : command => do
+  let env ← getEnv
+  let program ←
+    match ProofForge.Extract.extractProgramIR env ``Examples.Counter.init
+        ``Tests.Fixtures.singleInvokeTransfer ``Examples.Counter.get with
+    | .ok p => pure p
+    | .error reason => throwError reason
+  let lowered ←
+    match ProofForge.Svm.IR.fromExtracted program with
+    | .ok p => pure p
+    | .error reason => throwError reason
+  let some transfer := lowered.methods.find? (·.ixName == "singleInvokeTransfer")
+    | throwError "missing single invoke transfer method"
+  match transfer.ops with
+  | #[.invoke 8 _ _ #[] none, .storeField "value" (.arg 0), .okState (.arg 0)] => pure ()
+  | _ => throwError s!"single invoke continuation IR mismatch: {repr transfer.ops}"
+
+#pf_guard_single_invoke_continuation
+
+elab "#pf_guard_indexed_transfer_result" : command => do
+  let env ← getEnv
+  let program ←
+    match ProofForge.Extract.extractProgramIR env ``Examples.Counter.init
+        ``Tests.Fixtures.indexedTransferResult ``Examples.Counter.get with
+    | .ok p => pure p
+    | .error reason => throwError reason
+  let lowered ←
+    match ProofForge.Svm.IR.fromExtracted program with
+    | .ok p => pure p
+    | .error reason => throwError reason
+  let some transfer := lowered.methods.find? (·.ixName == "indexedTransferResult")
+    | throwError "missing indexed transfer-result method"
+  match transfer.ops with
+  | #[.invoke 8 _
+        #[.u8le (.lit 12), .u64le (.arg 0), .u8le (.lit 6)] #[] none,
+      .returnU64 (.arg 0)] => pure ()
+  | _ => throwError s!"indexed TransferChecked result mismatch: {repr transfer.ops}"
+
+#pf_guard_indexed_transfer_result
+
+elab "#pf_guard_single_multi_seed_invoke_continuation" : command => do
+  let env ← getEnv
+  let program ←
+    match ProofForge.Extract.extractProgramIR env ``Examples.Counter.init
+        ``Tests.Fixtures.singleMultiSeedTransfer ``Examples.Counter.get with
+    | .ok p => pure p
+    | .error reason => throwError reason
+  let lowered ←
+    match ProofForge.Svm.IR.fromExtracted program with
+    | .ok p => pure p
+    | .error reason => throwError reason
+  let some transfer := lowered.methods.find? (·.ixName == "singleMultiSeedTransfer")
+    | throwError "missing single multi-seed transfer method"
+  let expectedSeeds : Array ProofForge.Svm.Ops.PdaSeed :=
+    #[.ascii "vault", .stateKey, .accKey 3]
+  match transfer.ops with
+  | #[.invoke 8 _ _ seeds (some (.ext (.findPdaSeeds bumpSeeds) #[])),
+      .storeField "value" (.arg 0), .okState (.arg 0)] =>
+        unless seeds == expectedSeeds && bumpSeeds == expectedSeeds do
+          throwError s!"single multi-seed list mismatch: {repr transfer.ops}"
+  | _ =>
+      throwError s!"single multi-seed continuation IR mismatch: {repr transfer.ops}"
+
+#pf_guard_single_multi_seed_invoke_continuation
+
+elab "#pf_guard_dynamic_cpi_word_widths" : command => do
+  let env ← getEnv
+  let program ←
+    match ProofForge.Extract.extractProgramIR env ``Examples.Counter.init
+        ``Tests.Fixtures.dynamicCpiWords ``Examples.Counter.get with
+    | .ok p => pure p
+    | .error reason => throwError reason
+  let lowered ←
+    match ProofForge.Svm.IR.fromExtracted program with
+    | .ok p => pure p
+    | .error reason => throwError reason
+  let some method := lowered.methods.find? (·.ixName == "dynamicCpiWords")
+    | throwError "missing dynamic CPI word method"
+  match method.ops with
+  | #[.invoke 1 #[]
+        #[.u8le (.arg 0), .u16le (.arg 0), .u32le (.arg 0), .u64le (.arg 0)] #[] none,
+      .storeField "value" (.arg 0), .okState (.arg 0)] => pure ()
+  | _ => throwError s!"dynamic CPI word IR mismatch: {repr method.ops}"
+  let asm ←
+    match ProofForge.Svm.Emit.emitProgramAsm program with
+    | .ok asm => pure asm
+    | .error reason => throwError reason
+  unless asm.contains "; invoke programIx=2 metas=0 dataLen=15" &&
+      asm.contains "stxb [r9 + 40], r1" && asm.contains "stxh [r9 + 41], r1" &&
+      asm.contains "stxw [r9 + 43], r1" && asm.contains "stxdw [r9 + 47], r1" do
+    throwError "dynamic CPI words lost their packed little-endian widths"
+
+#pf_guard_dynamic_cpi_word_widths
+
+elab "#pf_guard_multi_seed_pda_account_check" : command => do
+  let env ← getEnv
+  let program ←
+    match ProofForge.Extract.extractProgramIR env ``Examples.Counter.init
+        ``Examples.Counter.increment ``Tests.Fixtures.checkMultiSeedPda with
+    | .ok p => pure p
+    | .error reason => throwError reason
+  let lowered ←
+    match ProofForge.Svm.IR.fromExtracted program with
+    | .ok p => pure p
+    | .error reason => throwError reason
+  let some check := lowered.methods.find? (·.ixName == "checkMultiSeedPda")
+    | throwError "missing multi-seed PDA check method"
+  let seeds : Array ProofForge.Svm.Ops.PdaSeed :=
+    #[.ascii "vault", .stateKey, .accKey 3]
+  unless check.ops == #[.returnU64 (.ext (.checkPdaSeeds 5 seeds) #[])] do
+    throwError s!"multi-seed PDA check IR mismatch: {repr check.ops}"
+  unless ProofForge.Svm.IR.cpiAccountCount lowered == 7 do
+    throwError s!"multi-seed PDA check account scan stopped at " ++
+      s!"{ProofForge.Svm.IR.cpiAccountCount lowered}"
+  let asm ←
+    match ProofForge.Svm.Emit.emitProgramAsm program with
+    | .ok asm => pure asm
+    | .error reason => throwError reason
+  unless asm.contains "; checkPdaSeeds account=5 count=3" do
+    throwError "multi-seed full-key PDA check emission is missing"
+
+#pf_guard_multi_seed_pda_account_check
+
+elab "#pf_guard_malformed_external_write_rejected" : command => do
+  let env ← getEnv
+  match ProofForge.Extract.extractProgramIR env ``Tests.Fixtures.initChoice
+      ``Tests.Fixtures.malformedExternalWrite ``Tests.Fixtures.getChosen with
+  | .ok _ => throwError "dynamic external-account write was silently accepted"
+  | .error reason =>
+      unless reason.contains "external account write operands" do
+        throwError s!"unexpected malformed external-account write error: {reason}"
+
+#pf_guard_malformed_external_write_rejected
+
+elab "#pf_guard_dynamic_cursor_geometry_rejected" : command => do
+  let env ← getEnv
+  match ProofForge.Extract.extractProgramIR env ``Tests.Fixtures.initChoice
+      ``Tests.Fixtures.malformedOrderCursor ``Tests.Fixtures.getChosen with
+  | .ok _ => throwError "dynamic account-storage cursor geometry was silently accepted"
+  | .error reason =>
+      unless reason.contains "extract/unsupported: body" do
+        throwError s!"unexpected dynamic cursor geometry error: {reason}"
+
+#pf_guard_dynamic_cursor_geometry_rejected
+
+elab "#pf_guard_account_effect_lexical_reads" : command => do
+  let env ← getEnv
+  let extract (mutation : Name) := do
+    let program ←
+      match ProofForge.Extract.extractProgramIR env ``Tests.Fixtures.initChoice mutation
+          ``Tests.Fixtures.getChosen with
+      | .ok program => pure program
+      | .error reason => throwError reason
+    match ProofForge.Svm.IR.fromExtracted program with
+    | .ok program => pure program
+    | .error reason => throwError reason
+  let beforeProgram ← extract ``Tests.Fixtures.accountReadBeforeWrite
+  let afterProgram ← extract ``Tests.Fixtures.accountReadAfterWrite
+  let facadeProgram ← extract ``Tests.Fixtures.accountFacadeReadBeforeWrite
+  let inlineFacadeProgram ← extract ``Tests.Fixtures.accountFacadeInlineReadBeforeWrite
+  let some before := beforeProgram.methods.find? (·.ixName == "accountReadBeforeWrite")
+    | throwError "missing accountReadBeforeWrite"
+  let some after := afterProgram.methods.find? (·.ixName == "accountReadAfterWrite")
+    | throwError "missing accountReadAfterWrite"
+  let some facade := facadeProgram.methods.find? (·.ixName == "accountFacadeReadBeforeWrite")
+    | throwError "missing accountFacadeReadBeforeWrite"
+  let some inlineFacade := inlineFacadeProgram.methods.find?
+      (·.ixName == "accountFacadeInlineReadBeforeWrite")
+    | throwError "missing accountFacadeInlineReadBeforeWrite"
+  match before.ops with
+  | #[.letLocal snapshot (.ext (.accDataWord 1 0) #[]),
+      .component (.accountStorage (.writeWord field (.lit 0) (.arg 0))),
+      .storeField "chosen" (.arg 0), .okState (.local result)] =>
+        unless snapshot == result && field.region.account == 1 && field.firstWord == 0 do
+          throwError s!"pre-write account snapshot mismatch: {repr before.ops}"
+  | _ => throwError s!"pre-write account snapshot reordered: {repr before.ops}"
+  match after.ops with
+  | #[.component (.accountStorage (.writeWord field (.lit 0) (.arg 0))),
+      .storeField "chosen" (.arg 0), .okState (.ext (.accDataWord 1 0) #[])] =>
+        unless field.region.account == 1 && field.firstWord == 0 do
+          throwError s!"post-write account read mismatch: {repr after.ops}"
+  | _ => throwError s!"post-write account read reordered: {repr after.ops}"
+  match facade.ops with
+  | #[.letLocal snapshot
+        (.ext (.component (.accountStorage (.readWord source))) #[.arg 0]),
+      .component (.accountStorage (.writeWord field (.arg 0) (.local value))),
+      .storeField "chosen" (.local stored), .okState (.local result)] =>
+        unless snapshot == value && value == stored && stored == result &&
+            source.region.account == 1 && source.firstWord == 8 &&
+            source.region.strideWords == 2 && source.region.capacity == 4 &&
+            source.region.indexBase == .one &&
+            field.region.account == 1 && field.firstWord == 9 &&
+            field.region.strideWords == 2 && field.region.capacity == 4 &&
+            field.region.indexBase == .one do
+          throwError s!"facade account snapshot mismatch: {repr facade.ops}"
+  | _ => throwError s!"facade account snapshot was not materialized: {repr facade.ops}"
+  match inlineFacade.ops with
+  | #[.joinLocal result,
+      .letLocal snapshotLocal
+        (.ext (.component (.accountStorage (.readWord source))) #[.arg 0]),
+      .component (.accountStorage (.writeWord field (.arg 0) (.arg 1))),
+      .setLocal producerResult (.local helperResult),
+      .returnU64 (.local returned)] =>
+        unless result == producerResult && snapshotLocal == helperResult &&
+            result == returned &&
+            source.region.account == 1 && source.firstWord == 8 &&
+            field.region.account == 1 && field.firstWord == 9 do
+          throwError s!"inline facade snapshot mismatch: {repr inlineFacade.ops}"
+  | _ =>
+      throwError s!"inline facade snapshot was not materialized: {repr inlineFacade.ops}"
+
+#pf_guard_account_effect_lexical_reads
+
+#pf_extract Examples.Counter.init Examples.Counter.increment Examples.Counter.nonzero
+
+#pf_extract Examples.Flag.init Examples.Flag.setFlag Examples.Flag.getFlag
+
+#pf_extract Examples.Maybe.init Examples.Maybe.setSome Examples.Maybe.isSome
+
+#pf_extract Examples.Maybe.init Examples.Maybe.setSome Examples.Maybe.getValue
+
+#pf_extract Examples.Window.init Examples.Window.setTail Examples.Window.getHead
+
+#pf_extract Examples.Phase.init Examples.Phase.setLive Examples.Phase.isLive
+
+#pf_extract Examples.Svm.Choice.init Examples.Svm.Choice.setHold Examples.Svm.Choice.getHeld
+
+#pf_extract Examples.Svm.Clock.init Examples.Svm.Clock.stamp Examples.Svm.Clock.height
+
+#pf_extract Examples.Svm.Clock.init Examples.Svm.Clock.stamp Examples.Svm.Clock.era
+
+#pf_extract Examples.Svm.Clock.init Examples.Svm.Clock.stamp Examples.Svm.Clock.key0
+
+#pf_extract Examples.Svm.Transfer.init Examples.Svm.Transfer.transfer Examples.Svm.Transfer.get
+
+#pf_extract Examples.Svm.Ping.init Examples.Svm.Ping.ping Examples.Svm.Ping.get
+
+#pf_extract Examples.Svm.Call.init Examples.Svm.Call.call Examples.Svm.Call.get
+
+#pf_extract Examples.Svm.Info.init Examples.Svm.Info.touch Examples.Svm.Info.lamports
+
+#pf_extract Examples.Svm.Peer.init Examples.Svm.Peer.touch Examples.Svm.Peer.lamports1
+
+#pf_extract Examples.Svm.Pda.init Examples.Svm.Pda.touch Examples.Svm.Pda.bump
+
+#pf_extract Examples.Svm.Pda.init Examples.Svm.Pda.touch Examples.Svm.Pda.check
+
+#pf_extract Examples.Svm.Pda.init Examples.Svm.Pda.touch Examples.Svm.Pda.checkBad
+
+#pf_extract Examples.Svm.Signed.init Examples.Svm.Signed.signed Examples.Svm.Signed.get
+
+#pf_extract Examples.Svm.Create.init Examples.Svm.Create.create Examples.Svm.Create.get
+
+#pf_extract Examples.Svm.TokenXfer.init Examples.Svm.TokenXfer.send Examples.Svm.TokenXfer.get
+
+#pf_extract Examples.Svm.Token2022.init Examples.Svm.Token2022.send Examples.Svm.Token2022.get
+
+#pf_extract Examples.Svm.Ata.init Examples.Svm.Ata.openAta Examples.Svm.Ata.get
+
+#pf_extract Examples.Svm.Rent.init Examples.Svm.Rent.stamp Examples.Svm.Rent.exempt
+
+#pf_extract Examples.Svm.TokenMint.init Examples.Svm.TokenMint.mintTo Examples.Svm.TokenMint.get
+
+#pf_extract Examples.Svm.SysAlloc.init Examples.Svm.SysAlloc.alloc Examples.Svm.SysAlloc.get
+
+#pf_extract Examples.Svm.SysAlloc.init Examples.Svm.SysAlloc.assign Examples.Svm.SysAlloc.get
+
+#pf_extract Examples.Svm.TokenAcc.init Examples.Svm.TokenAcc.openAcc Examples.Svm.TokenAcc.get
+
+#pf_extract Examples.Svm.TokenAcc.init Examples.Svm.TokenAcc.closeAcc Examples.Svm.TokenAcc.get
+
+#pf_extract Examples.Svm.Memo.init Examples.Svm.Memo.write Examples.Svm.Memo.get
+
+#pf_extract Examples.Svm.CreatePda.init Examples.Svm.CreatePda.openPda Examples.Svm.CreatePda.get
+
+#pf_extract Examples.Svm.CreatePda.init Examples.Svm.CreatePda.openBad Examples.Svm.CreatePda.get
+
+#pf_extract Examples.Svm.TokenApprove.init Examples.Svm.TokenApprove.approve Examples.Svm.TokenApprove.get
+
+#pf_extract Examples.Svm.TokenFreeze.init Examples.Svm.TokenFreeze.freeze Examples.Svm.TokenFreeze.get
+
+#pf_extract Examples.Svm.TokenFreeze.init Examples.Svm.TokenFreeze.thaw Examples.Svm.TokenFreeze.get
+
+#pf_extract Examples.Svm.TokenAuth.init Examples.Svm.TokenAuth.setAuth Examples.Svm.TokenAuth.get
+
+#pf_extract Examples.Svm.TokenAuth.init Examples.Svm.TokenAuth.revoke Examples.Svm.TokenAuth.get
+
+#pf_extract Examples.Svm.Epoch.init Examples.Svm.Epoch.stamp Examples.Svm.Epoch.span
+
+#pf_extract Examples.Svm.TokenSize.init Examples.Svm.TokenSize.size Examples.Svm.TokenSize.get
+
+#pf_extract Examples.Svm.SysSeed.init Examples.Svm.SysSeed.openSeed Examples.Svm.SysSeed.get
+
+#pf_extract Examples.Svm.SysSeed.init Examples.Svm.SysSeed.createSeed Examples.Svm.SysSeed.get
+
+#pf_extract Examples.Svm.SysSeed.init Examples.Svm.SysSeed.assignSeed Examples.Svm.SysSeed.get
+
+#pf_extract Examples.Svm.SysXfer.init Examples.Svm.SysXfer.sendSeed Examples.Svm.SysXfer.get
+
+#pf_extract Examples.Svm.TokenMint2.init Examples.Svm.TokenMint2.openMint Examples.Svm.TokenMint2.get
+
+#pf_extract Examples.Svm.TokenNative.init Examples.Svm.TokenNative.syncNative Examples.Svm.TokenNative.get
+
+#pf_extract Examples.Svm.Hash.init Examples.Svm.Hash.touch Examples.Svm.Hash.vault
+
+#pf_extract Examples.Svm.Hash.init Examples.Svm.Hash.touch Examples.Svm.Hash.ok
+
+#pf_extract Examples.Svm.Hash.init Examples.Svm.Hash.touch Examples.Svm.Hash.empty
+
+#pf_extract Examples.Svm.Keys.init Examples.Svm.Keys.touch Examples.Svm.Keys.key00
+
+#pf_extract Examples.Svm.Keys.init Examples.Svm.Keys.touch Examples.Svm.Keys.key10
+
+#pf_extract Examples.Svm.Keccak.init Examples.Svm.Keccak.touch Examples.Svm.Keccak.vault
+
+#pf_extract Examples.Svm.Keccak.init Examples.Svm.Keccak.touch Examples.Svm.Keccak.empty
+
+#pf_extract Examples.Svm.Trio.init Examples.Svm.Trio.touch Examples.Svm.Trio.lamports2
+
+#pf_extract Examples.Svm.Trio.init Examples.Svm.Trio.touch Examples.Svm.Trio.needSig1
+
+#pf_extract Examples.Svm.Trio.init Examples.Svm.Trio.touch Examples.Svm.Trio.self2
+
+#pf_extract Examples.Svm.Gate.init Examples.Svm.Gate.openGate Examples.Svm.Gate.now
+
+#pf_extract Examples.Svm.Nonce.init Examples.Svm.Nonce.advance Examples.Svm.Nonce.get
+
+#pf_extract Examples.Svm.TokenOwner.init Examples.Svm.TokenOwner.setOwner Examples.Svm.TokenOwner.get
+
+#pf_extract Examples.Svm.TokenMs.init Examples.Svm.TokenMs.openMs Examples.Svm.TokenMs.get
+
+#pf_extract Tests.Fixtures.initTagged Tests.Fixtures.setTagged Tests.Fixtures.getTagged
+
+#pf_extract Tests.Fixtures.initEvent Tests.Fixtures.setEventCancel Tests.Fixtures.getEvent
+
+#pf_extract Tests.Fixtures.initMarketEvent Tests.Fixtures.setMarketFee Tests.Fixtures.marketEventValue
+
+#pf_extract Tests.Fixtures.initMarketEventBatch Tests.Fixtures.setMarketEventAt
+  Tests.Fixtures.firstMarketEventValue
+
+/--
+error: extract/unsupported: field items Array is not fixed-length; use Vector
+-/
+#guard_msgs (error) in
+#pf_extract Tests.Fixtures.initBag Tests.Fixtures.setBagHead Tests.Fixtures.getBagHead
+
+/--
+error: extract/unsupported: mutating method missing checked arith
+-/
+#guard_msgs (error) in
+#pf_extract Examples.Counter.init Tests.Fixtures.wrappingMul Examples.Counter.get
