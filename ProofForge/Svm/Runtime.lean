@@ -709,28 +709,7 @@ def token2022SetAccountAuthorityImmutable : UInt64 :=
       { acc := 0, signer := true, writable := false }]
     #[.u8le 6, .u8le 2, .u8le 1, .accKey 2]
 
-/--
-Token-2022 `TransferChecked` over a transfer-fee mint. External accounts mirror the base recipe:
-0 authority (signer), 1 source (writable), 2 mint, 3 destination (writable), 4 Token-2022
-program. The mint must carry exactly one official `TransferFeeConfig` extension entry (official
-108-byte body); source and destination must each carry exactly one official `TransferFeeAmount`
-entry (8-byte withheld body) — token-2022 requires it for fee-charging mints and rejects the
-CPI without it. The emitted preflight checks every byte of both admissions before any
-persistent write or CPI. The schedule math — newer fee once `clockEpoch` reaches its epoch,
-older otherwise — and the fee charge itself stay with the token program across the CPI
-boundary: the schedule bodies sit at non-word-aligned TLV offsets, so reading them on this
-target stays fail closed until a byte-granular account-data leaf lands.
--/
-def token2022TransferCheckedTransferFee (amount : UInt64) (decimals : UInt64) : UInt64 :=
-  invoke 4
-    #[{ acc := 1, signer := false, writable := true,
-        accountData := some .token2022TransferFeeAmountAccount },
-      { acc := 2, signer := false, writable := false,
-        accountData := some .token2022TransferFeeConfigMint },
-      { acc := 3, signer := false, writable := true,
-        accountData := some .token2022TransferFeeAmountAccount },
-      { acc := 0, signer := true, writable := false }]
-    #[.u8le 12, .u64le amount, .u8le decimals]
+
 
 /--
 Token-2022 `TransferChecked` over a pausable mint. The mint must carry exactly one official
@@ -1335,6 +1314,41 @@ or copy account data.
   let _ := acc
   let _ := word
   0
+
+/--
+账户 `acc` data 区的一个字节（零基 `byteOffset`）。`acc` / `byteOffset` 必须在抽出时是
+常量；`acc ≥ 1` 走 walk。目标发射器先检查 `data_len > byteOffset`，越界以 `Custom(1)`
+fail closed。这个叶子补上 `accDataWord` 的 8 字节对齐盲区：官方 TLV body（如
+`TransferFeeConfig` 的 schedule 记录）相对账户起点不按 8 字节对齐，word 读无法诚实寻址。
+零拷贝，不分配，不复制。
+-/
+@[irreducible] def accDataByteAt (acc byteOffset : UInt64) : UInt64 :=
+  let _ := acc
+  let _ := byteOffset
+  0
+
+/--
+Token-2022 `TransferChecked` over a transfer-fee mint. External accounts mirror the base
+recipe: 0 authority (signer), 1 source (writable), 2 mint, 3 destination (writable), 4
+Token-2022 program. The mint must carry exactly one official `TransferFeeConfig` extension
+entry; source and destination must each carry exactly one official `TransferFeeAmount`
+entry — token-2022 requires it for fee-charging mints and rejects the CPI without it. The
+emitted preflight checks every byte of both admissions before any persistent write or CPI.
+The schedule math lives in the `Svm.Sdk.Token2022` facade helpers
+(`transferFeeBasisPoints` / `transferFeeMaximumFee`), which read the active schedule
+through the byte-granular `accDataByteAt` leaf; the actual charge stays with the token
+program over the CPI boundary.
+-/
+def token2022TransferCheckedTransferFee (amount : UInt64) (decimals : UInt64) : UInt64 :=
+  invoke 4
+    #[{ acc := 1, signer := false, writable := true,
+        accountData := some .token2022TransferFeeAmountAccount },
+      { acc := 2, signer := false, writable := false,
+        accountData := some .token2022TransferFeeConfigMint },
+      { acc := 3, signer := false, writable := true,
+        accountData := some .token2022TransferFeeAmountAccount },
+      { acc := 0, signer := true, writable := false }]
+    #[.u8le 12, .u64le amount, .u8le decimals]
 
 /--
 账户 `acc` 的固定 stride 槽中第 `index` 个 u64。`acc`、`baseWord`、`strideWords` 和

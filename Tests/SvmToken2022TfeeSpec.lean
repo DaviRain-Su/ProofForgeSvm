@@ -58,8 +58,18 @@ elab "#pf_guard_token_2022_tfee_ir" : command => do
         { acc := 3, writable := true, accountData := some .token2022TransferFeeAmountAccount },
         { acc := 0, signer := true }]
       #[.u8le (.lit 12), .u64le (.arg 0), .u8le (.lit 6)] #[] none
-  unless method.ops.contains expectedInvoke do
-    throwError s!"transfer-fee constrained CPI was not retained: {repr method.ops}"
+  let rec opsDeepContains (fuel : Nat) (ops : Array IR.Op) : Bool :=
+    match fuel with
+    | 0 => false
+    | fuel' + 1 =>
+      ops.any fun op =>
+        op == expectedInvoke ||
+          match op with
+          | .ite _ _ _ thn els => opsDeepContains fuel' thn || opsDeepContains fuel' els
+          | _ => false
+  unless opsDeepContains 64 method.ops do
+    let all := program.methods.map fun m => s!"{m.ixName}:{repr m.ops}"
+    throwError s!"transfer-fee constrained CPI was not retained: methods={all} ops={repr method.ops}"
   let asm ←
     match Emit.emitAsm program with
     | .ok asm => pure asm

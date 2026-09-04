@@ -53,11 +53,52 @@ owns the on-chain rejection. The new owner is the public key of external account
 @[pf_inline] def setAccountAuthorityImmutable : UInt64 :=
   ProofForge.Svm.Runtime.token2022SetAccountAuthorityImmutable
 
-/--
-Token-2022 `TransferChecked` over a transfer-fee mint: the mint must carry exactly one official
-`TransferFeeConfig` entry; source/destination stay on the closed base policy. The token program
-charges the fee over the CPI boundary; this facade only guards admission.
--/
+/-- Older-schedule basis points (little-endian u16 at record base + 16). -/
+@[pf_inline] def transferFeeBasisPointsOlder : UInt64 :=
+  ProofForge.Svm.Runtime.accDataByteAt 2 258 |||
+    (ProofForge.Svm.Runtime.accDataByteAt 2 259 <<< 8)
+
+/-- Newer-schedule basis points (little-endian u16 at record base + 16). -/
+@[pf_inline] def transferFeeBasisPointsNewer : UInt64 :=
+  ProofForge.Svm.Runtime.accDataByteAt 2 276 |||
+    (ProofForge.Svm.Runtime.accDataByteAt 2 277 <<< 8)
+
+/-- Official `get_epoch_fee` basis points: newer once `clockEpoch` reaches its epoch. -/
+@[pf_inline] def transferFeeBasisPoints : UInt64 :=
+  if ProofForge.Svm.Runtime.clockEpoch < ProofForge.Svm.Runtime.accDataByteAt 2 260 then
+    transferFeeBasisPointsOlder
+  else
+    transferFeeBasisPointsNewer
+
+/-- Older-schedule maximum fee (little-endian u64 at record base + 8). -/
+@[pf_inline] def transferFeeMaximumFeeOlder : UInt64 :=
+  ProofForge.Svm.Runtime.accDataByteAt 2 250 |||
+    (ProofForge.Svm.Runtime.accDataByteAt 2 251 <<< 8) |||
+    (ProofForge.Svm.Runtime.accDataByteAt 2 252 <<< 16) |||
+    (ProofForge.Svm.Runtime.accDataByteAt 2 253 <<< 24) |||
+    (ProofForge.Svm.Runtime.accDataByteAt 2 254 <<< 32) |||
+    (ProofForge.Svm.Runtime.accDataByteAt 2 255 <<< 40) |||
+    (ProofForge.Svm.Runtime.accDataByteAt 2 256 <<< 48) |||
+    (ProofForge.Svm.Runtime.accDataByteAt 2 257 <<< 56)
+
+/-- Newer-schedule maximum fee (little-endian u64 at record base + 8). -/
+@[pf_inline] def transferFeeMaximumFeeNewer : UInt64 :=
+  ProofForge.Svm.Runtime.accDataByteAt 2 268 |||
+    (ProofForge.Svm.Runtime.accDataByteAt 2 269 <<< 8) |||
+    (ProofForge.Svm.Runtime.accDataByteAt 2 270 <<< 16) |||
+    (ProofForge.Svm.Runtime.accDataByteAt 2 271 <<< 24) |||
+    (ProofForge.Svm.Runtime.accDataByteAt 2 272 <<< 32) |||
+    (ProofForge.Svm.Runtime.accDataByteAt 2 273 <<< 40) |||
+    (ProofForge.Svm.Runtime.accDataByteAt 2 274 <<< 48) |||
+    (ProofForge.Svm.Runtime.accDataByteAt 2 275 <<< 56)
+
+/-- Official `get_epoch_fee` maximum fee: newer once `clockEpoch` reaches its epoch. -/
+@[pf_inline] def transferFeeMaximumFee : UInt64 :=
+  if ProofForge.Svm.Runtime.clockEpoch < ProofForge.Svm.Runtime.accDataByteAt 2 260 then
+    transferFeeMaximumFeeOlder
+  else
+    transferFeeMaximumFeeNewer
+
 @[pf_inline] def transferCheckedTransferFee (amount decimals : UInt64) : UInt64 :=
   ProofForge.Svm.Runtime.token2022TransferCheckedTransferFee amount decimals
 

@@ -57,6 +57,8 @@ private def svmLeaf (kind : Svm.Ops.ValKind) : Val :=
   svmLeaf (.accOwnerWord acc word)
 @[match_pattern] def Val.accDataWord (acc word : Nat) : Val :=
   svmLeaf (.accDataWord acc word)
+@[match_pattern] def Val.accDataByteAt (acc byteOffset : Nat) : Val :=
+  svmLeaf (.accDataByteAt acc byteOffset)
 @[match_pattern] def Val.accDataWordAt
     (acc baseWord strideWords capacity : Nat) (index : Val) : Val :=
   .ext (.svm (.component (.accountStorage

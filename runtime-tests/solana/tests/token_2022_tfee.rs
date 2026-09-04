@@ -100,6 +100,14 @@ fn tfee_mint(authority: Pubkey, schedule_epoch: u64) -> Account {
     )
 }
 
+fn harness_logged() -> (Pubkey, Mollusk) {
+    let (program_id, mut mollusk) = harness();
+    mollusk.logger = Some(std::rc::Rc::new(std::cell::RefCell::new(
+        solana_svm_log_collector::LogCollector::default(),
+    )));
+    (program_id, mollusk)
+}
+
 fn build_ix(
     program_id: Pubkey,
     name: &str,
@@ -156,6 +164,32 @@ fn tfee_accounts(
         ),
         token2022::keyed_account(),
     ]
+}
+
+#[allow(dead_code)]
+struct Fixture {
+    authority: Pubkey,
+    source: Pubkey,
+    mint: Pubkey,
+    dest: Pubkey,
+}
+
+#[allow(dead_code)]
+fn fixture() -> (Fixture, Vec<(Pubkey, Account)>, Vec<AccountMeta>) {
+    let authority = Pubkey::new_unique();
+    let source = Pubkey::new_unique();
+    let mint = Pubkey::new_unique();
+    let dest = Pubkey::new_unique();
+    let accounts = tfee_accounts(authority, source, mint, dest, 0, &Pubkey::new_unique());
+    let metas = vec![
+        AccountMeta::new(common::dummy_state_key(&Pubkey::new_unique()), false),
+        AccountMeta::new(authority, true),
+        AccountMeta::new(source, false),
+        AccountMeta::new_readonly(mint, false),
+        AccountMeta::new(dest, false),
+        AccountMeta::new_readonly(token2022::ID, false),
+    ];
+    (Fixture { authority, source, mint, dest }, accounts, metas)
 }
 
 #[test]
@@ -280,6 +314,9 @@ fn transfer_fee_future_schedule_only_reaches_newer_fee() {
         ],
     );
 }
+
+
+
 
 #[test]
 fn missing_signer_fails_closed() {

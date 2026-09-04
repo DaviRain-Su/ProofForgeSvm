@@ -93,6 +93,7 @@ inductive ValKind where
   | accKeyWord (acc word : Nat)
   | accOwnerWord (acc word : Nat)
   | accDataWord (acc word : Nat)
+  | accDataByteAt (acc byteOffset : Nat)
   | component (query : Component.Query)
   | accLamportsN (acc : Nat)
   | accDataLenN (acc : Nat)
@@ -215,6 +216,7 @@ def byteSwap64 (word : Val) : Val := .ext .byteSwap64 #[word]
 def accKeyWord (acc word : Nat) : Val := leaf (.accKeyWord acc word)
 def accOwnerWord (acc word : Nat) : Val := leaf (.accOwnerWord acc word)
 def accDataWord (acc word : Nat) : Val := leaf (.accDataWord acc word)
+def accDataByteAt (acc byteOffset : Nat) : Val := leaf (.accDataByteAt acc byteOffset)
 def accDataWordAt (acc baseWord strideWords capacity : Nat) (index : Val) : Val :=
   .ext (.component (.accountStorage
     (.readWordZeroBased acc baseWord strideWords capacity))) #[index]
@@ -334,6 +336,8 @@ private partial def staticPayloadsWellFormed : Val → Bool
         operands.all staticPayloadsWellFormed
   | .ext (.accDataWord acc word) operands =>
       accInRange acc && dataWordInRange word && operands.all staticPayloadsWellFormed
+  | .ext (.accDataByteAt acc byteOffset) operands =>
+      accInRange acc && dataWordInRange byteOffset && operands.all staticPayloadsWellFormed
   | .ext (.component query) operands =>
       query.wellFormed maxTxAccountLocks && operands.all staticPayloadsWellFormed
   | .ext _ operands => operands.all staticPayloadsWellFormed
@@ -463,6 +467,7 @@ partial def valNeedsWalk : Val → Bool
        | .accLamports1 | .accOwner1 | .accDataLen1
        | .isSigner1 | .isWritable1 | .isExecutable1 => true
        | .accKeyWord acc _ | .accOwnerWord acc _ | .accDataWord acc _
+       | .accDataByteAt acc _
        | .sha256DataWord acc .. | .keccak256DataWord acc ..
        | .accLamportsN acc | .accDataLenN acc
        | .isSignerN acc | .isWritableN acc | .isExecutableN acc
@@ -490,6 +495,7 @@ partial def valMinAccounts : Val → Nat
         | .accLamports1 | .accOwner1 | .accDataLen1
         | .isSigner1 | .isWritable1 | .isExecutable1 => 2
         | .accKeyWord acc _ | .accOwnerWord acc _ | .accDataWord acc _
+        | .accDataByteAt acc _
         | .sha256DataWord acc .. | .keccak256DataWord acc ..
         | .accLamportsN acc | .accDataLenN acc
         | .isSignerN acc | .isWritableN acc | .isExecutableN acc

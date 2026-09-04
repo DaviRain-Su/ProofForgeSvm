@@ -255,6 +255,17 @@ private partial def asValNamed (env : Environment) (fuel : Nat) (n : Name) (e : 
         some (.accDataWord a w)
       else none
     | _, _ => none
+  else if (endsWith e ".accDataByteAt" || isConstNamed e ``ProofForge.Svm.Runtime.accDataByteAt) &&
+      e.getAppArgs.size ≥ 2 then
+    match asStaticLit env fuel e.getAppArgs[e.getAppArgs.size - 2]!,
+        asStaticLit env fuel e.getAppArgs[e.getAppArgs.size - 1]! with
+    | some (.lit acc), some (.lit byteOffset) =>
+      let a := acc.toNat
+      let b := byteOffset.toNat
+      if Svm.Ops.accInRange a && Svm.Ops.dataWordInRange b then
+        some (.accDataByteAt a b)
+      else none
+    | _, _ => none
   else if (endsWith e ".memoryCompare" ||
       isConstNamed e ``ProofForge.Svm.Runtime.memoryCompare) && e.getAppArgs.size ≥ 5 then
     let args := e.getAppArgs
@@ -2222,6 +2233,7 @@ private def asOkStateCore (env : Environment) (e : Expr) : Option Ops.Val :=
             | some (.accKeyWord a w) => some (.accKeyWord a w)
             | some (.accOwnerWord a w) => some (.accOwnerWord a w)
             | some (.accDataWord a w) => some (.accDataWord a w)
+            | some (.accDataByteAt a b) => some (.accDataByteAt a b)
             | some (.accDataWordAt a b s c i) => some (.accDataWordAt a b s c i)
             | some (.ext (.svm (.component query)) operands) =>
                 some (.ext (.svm (.component query)) operands)

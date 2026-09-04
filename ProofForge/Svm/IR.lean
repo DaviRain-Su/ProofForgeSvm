@@ -939,6 +939,7 @@ private partial def valCanon : Ops.Val → String
   | .ext (.accKeyWord acc word) #[] => s!"kw.{acc}.{word}"
   | .ext (.accOwnerWord acc word) #[] => s!"ow.{acc}.{word}"
   | .ext (.accDataWord acc word) #[] => s!"dw.{acc}.{word}"
+  | .ext (.accDataByteAt acc byteOffset) #[] => s!"db.{acc}.{byteOffset}"
   | .ext (.component query) operands => query.canonical valCanon operands
   | .ext (.accLamportsN acc) #[] => s!"lpN.{acc}"
   | .ext (.accDataLenN acc) #[] => s!"dlN.{acc}"

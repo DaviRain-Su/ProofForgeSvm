@@ -664,6 +664,40 @@ private def emitLoadAccDataWord (acc word stackOff : Nat) (scope : String) : Str
   stxdw [r10 - {stackOff}], r1
 "
 
+/-- Read one byte from account data. Check `data_len > byteOffset` before forming the data
+pointer so a short account exits with `Custom(1)`. This byte-level read addresses official
+TLV bodies that sit at non-word-aligned offsets relative to the account start. -/
+private def emitLoadAccDataByte (acc byteOffset stackOff : Nat) (scope : String) : String :=
+  let required := byteOffset + 1
+  let ok := s!"ok_data_byte_{scope}_{acc}_{byteOffset}_{stackOff}"
+  if acc == 0 then
+    s!"\
+  ; load acc0 data byte {byteOffset}
+  ldxdw r2, [r6 + ACC0_DATA_LEN]
+  jgt r2, {byteOffset}, {ok}
+  lddw r0, 0x1
+  exit
+{ok}:
+  ldxb r1, [r6 + ACC0_DATA + {byteOffset}]
+  stxdw [r10 - {stackOff}], r1
+"
+  else
+    s!"\
+  ; load walked acc{acc} data byte {byteOffset}
+  ldxdw r1, [r10 - {headerStack acc}]
+  ldxdw r2, [r1 + 80]
+  lddw r3, {required}
+  jge r2, r3, {ok}
+  lddw r0, 0x1
+  exit
+{ok}:
+  add64 r1, 88
+  lddw r2, {byteOffset}
+  add64 r1, r2
+  ldxb r1, [r1 + 0]
+  stxdw [r10 - {stackOff}], r1
+"
+
 /--
 账户 `acc` 的 header 字段。账户 0 走固定 Loader 偏移；≥1 走 walk。
 `kind`：lamports / dataLen / signer / writable / executable / key0。
@@ -1229,6 +1263,8 @@ private partial def loadVal (p : IR.Program) (v : Ops.Val) (stackOff : Nat) (non
     .ok (emitLoadAccWord "owner" acc word stackOff)
   | .ext (.accDataWord acc word) #[] =>
     .ok (emitLoadAccDataWord acc word stackOff scope)
+  | .ext (.accDataByteAt acc byteOffset) #[] =>
+    .ok (emitLoadAccDataByte acc byteOffset stackOff scope)
   | .ext (.component query) operands =>
     Component.Emit.emitQuery
       { loadValue := fun value valueStackOff valueNonce valueScope =>
