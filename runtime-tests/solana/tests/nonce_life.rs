@@ -13,6 +13,16 @@ use {
 const DISCRIMINATOR_DOMAIN: &str = "proof-forge-solana-v1:";
 const BASE_LAMPORTS: u64 = 10 * LAMPORTS_PER_SOL;
 const NONCE_LEN: usize = 80;
+const NONCE_RENT: u64 = 1_447_680; // Rent::default().minimum_balance(80) with the live sysvar
+
+fn system_id() -> Pubkey {
+    Pubkey::new_from_array([0u8; 32])
+}
+
+fn rent_id() -> Pubkey {
+    use std::str::FromStr;
+    Pubkey::from_str("SysvarRent111111111111111111111111111111111").expect("rent sysvar id")
+}
 
 fn instruction_discriminator(name: &str, param_count: usize) -> [u8; 8] {
     let params = vec!["u64"; param_count].join(",");
@@ -102,4 +112,63 @@ fn open_creates_rent_exempt_account() {
                 .build(),
         ],
     );
+}
+
+/// `initNonce` outer: state(0), nonce(1 writable), recent(2 r), rent(3 r), System(4 r).
+fn init_ix(program_id: Pubkey, nonce: Pubkey, recent: Pubkey, rent: Pubkey) -> Instruction {
+    let disc = instruction_discriminator("initNonce", 0);
+    let (system, _) = system_keyed();
+    Instruction::new_with_bytes(
+        program_id,
+        &instruction_data(&disc, &[]),
+        vec![
+            AccountMeta::new(common::dummy_state_key(&program_id), false),
+            AccountMeta::new(nonce, false),
+            AccountMeta::new_readonly(recent, false),
+            AccountMeta::new_readonly(rent, false),
+            AccountMeta::new_readonly(system, false),
+        ],
+    )
+}
+
+#[test]
+fn init_initializes_funded_nonce() {
+    let (program_id, mut mollusk) = harness();
+    // Populate the recent-blockhashes sysvar cache so System's InitializeNonceAccount
+    // finds a non-empty list (it rejects with NonceNoRecentBlockhashes otherwise).
+    mollusk.sysvars.recent_blockhashes = solana_sysvar::recent_blockhashes::RecentBlockhashes::from_iter([
+        solana_sysvar::recent_blockhashes::IterItem(0, &solana_hash::Hash::new_unique(), 5000),
+    ]);
+    let nonce = Pubkey::new_unique();
+    let rent = rent_id();
+    let recent = {
+        use std::str::FromStr;
+        Pubkey::from_str("SysvarRecentB1ockHashes11111111111111111111").expect("recent blockhashes sysvar id")
+    };
+    let ix = init_ix(program_id, nonce, recent, rent);
+    let (system, system_acc) = system_keyed();
+    let result = mollusk.process_instruction(
+        &ix,
+        &[
+            (common::dummy_state_key(&program_id), common::dummy_state_account(&program_id)),
+            (nonce, Account::new(NONCE_RENT, NONCE_LEN, &system_id())),
+            (recent, funded(0)),
+            (rent, Account::new(1, 0, &system_id())),
+            (system, system_acc),
+        ],
+    );
+    assert_eq!(
+        result.program_result,
+        mollusk_svm::result::ProgramResult::Success,
+        "initNonce CPI failed: {:?}",
+        result.program_result
+    );
+    let nonce_result = result
+        .resulting_accounts
+        .iter()
+        .find(|(k, _)| *k == nonce)
+        .map(|(_, a)| a.data.clone())
+        .expect("nonce account present");
+    assert_eq!(u32::from_le_bytes(nonce_result[..4].try_into().unwrap()), 1, "version");
+    assert_eq!(u32::from_le_bytes(nonce_result[4..8].try_into().unwrap()), 1, "initialized state");
 }

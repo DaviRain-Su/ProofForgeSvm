@@ -23,16 +23,25 @@ elab "#pf_guard_nonce_life_ir" : command => do
     match IR.fromExtracted extracted with
     | .ok program => pure program
     | .error reason => throwError reason
+  let some initMethod := program.methods.find? (·.ixName == "initNonce")
+    | throwError "missing NonceLife initNonce method"
+  let rec hasInvoke (ops : Array IR.Op) (n : Nat) : Bool :=
+    ops.any fun op =>
+      match op with
+      | .invoke _ metas _ _ _ => metas.size == n
+      | _ => false
+  unless hasInvoke initMethod.ops 3 do
+    throwError s!"initNonce CPI was not retained: {repr initMethod.ops}"
   let some openMethod := program.methods.find? (·.ixName == "openNonce")
     | throwError "missing NonceLife openNonce method"
   -- createRentExempt computes the rent via sol_get_rent_sysvar, so the lamports word is
   -- dynamic (a rent sysvar value), not a literal. Match the invoke by metas count.
-  let rec hasInvoke (ops : Array IR.Op) : Bool :=
+  let rec hasInvoke2 (ops : Array IR.Op) : Bool :=
     ops.any fun op =>
       match op with
       | .invoke _ metas _ _ _ => metas.size == 2
       | _ => false
-  unless hasInvoke openMethod.ops do
+  unless hasInvoke2 openMethod.ops do
     throwError s!"openNonce create CPI was not retained: {repr openMethod.ops}"
   let asm ←
     match Emit.emitAsm program with
@@ -60,7 +69,7 @@ private def expectCanonical (module : Name) (expected : String) : CommandElabM U
     throwError s!"{module}: nonce-life facade changed canonical IR: {actual}"
 
 elab "#pf_guard_nonce_life_digest" : command => do
-  expectCanonical `Examples.Svm.NonceLife "c3fa20791322ace7"
+  expectCanonical `Examples.Svm.NonceLife "43a8c37e4bc90e8f"
 
 #pf_guard_nonce_life_digest
 

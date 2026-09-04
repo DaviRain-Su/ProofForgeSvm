@@ -1138,17 +1138,17 @@ def systemAdvanceNonce : UInt64 :=
     #[.u32le 4]
 
 /--
-`system.initializeNonceAccount`：把外部账户 1 初始化为 nonce 账户，授权人为外层签名者
-(outer 0，即 state/authority)。外层：state(0 s) / authority(1 s) / nonce(2 w) /
-recent(3 r) / rent(4 r) / System(5)。CPI 账户序 [nonce, recent, rent] 匹配官方
-InitializeNonceAccount；数据 u32 tag 6 + authorized pubkey(取自外层账户 1 的 key)。
+`system.initializeNonceAccount`：把外层账户 1 初始化为 nonce 账户。外层：state(0) /
+nonce(1 w) / recent(2 r) / rent(3 r) / System(4)。CPI 账户序 [nonce, recent, rent]
+匹配官方 InitializeNonceAccount；数据 u32 tag 6 + authorized pubkey(取自外层账户 0
+的 key，即 state/authority)。
 -/
 def systemInitializeNonce : UInt64 :=
   invoke 3
-    #[{ acc := 1, signer := false, writable := true },
-      { acc := 2, signer := false, writable := false },
-      { acc := 3, signer := false, writable := false }]
-    #[.u32le 6, .accKey 1]
+    #[{ acc := 0, signer := false, writable := true },
+      { acc := 1, signer := false, writable := false },
+      { acc := 2, signer := false, writable := false }]
+    #[.u32le 6, .accKey 0]
 
 /--
 `system.withdrawNonceAccount`：从外部账户 1(nonce)提走 lamports 到外部账户 2。
