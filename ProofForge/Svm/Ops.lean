@@ -436,7 +436,8 @@ private partial def opStaticPayloadsWellFormed : Op → Bool
   | .joinLocal _ | .errorOverflow | .errorNamed _ => true
 
 def Op.wellFormed (op : Op) : Bool :=
-  ProofForge.Core.Ops.Op.wellFormed ValKind.arity OpExt.wellFormed op &&
+  ProofForge.Core.Ops.Op.wellFormed ValKind.arity
+    (fun kind n => n == ValKind.arity kind) OpExt.wellFormed op &&
     opStaticPayloadsWellFormed op
 
 private partial def walkOps (ops : Array Op) (predicate : Op → Bool) : Bool :=

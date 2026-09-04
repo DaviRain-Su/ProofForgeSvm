@@ -15,7 +15,7 @@ require sbpfSemantics from git
     `ProofForge.Svm.Attr` (below) extends the shared attributes with the SVM
     packed wire-entry adapters. -/
 require «proofforge-common» from git
-  "https://github.com/DaviRain-Su/ProofForgeCommon.git" @ "v0.1.0"
+  "https://github.com/DaviRain-Su/ProofForgeCommon.git" @ "main"
 
 /-- Contract-facing SVM SDK (+ Runtime/Source needed for `pf_inline` erase). No Emit. -/
 lean_lib ProofForgeSvmSdk where

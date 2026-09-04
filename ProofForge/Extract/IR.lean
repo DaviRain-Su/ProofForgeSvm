@@ -73,6 +73,7 @@ def OpExt.wellFormed : OpExt Val → Bool
   | .svm payload => svmExtWellFormed payload
 
 def Op.wellFormed (op : Op) : Bool :=
-  Core.Ops.Op.wellFormed ValKind.arity OpExt.wellFormed op
+  Core.Ops.Op.wellFormed ValKind.arity
+    (fun kind n => n == ValKind.arity kind) OpExt.wellFormed op
 
 end ProofForge.Extract.IR
