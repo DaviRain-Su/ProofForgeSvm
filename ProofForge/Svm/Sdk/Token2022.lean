@@ -68,6 +68,14 @@ Token-2022 `TransferChecked` over a pausable mint: the mint must carry exactly o
 @[pf_inline] def transferCheckedPausable (amount decimals : UInt64) : UInt64 :=
   ProofForge.Svm.Runtime.token2022TransferCheckedPausable amount decimals
 
+/--
+Token-2022 `TransferChecked` whose source carries exactly one official `CpiGuard` entry;
+the token program owns the lock semantics over the CPI boundary and rejects locked,
+owner-signed in-CPI transfers.
+-/
+@[pf_inline] def transferCheckedCpiGuard (amount decimals : UInt64) : UInt64 :=
+  ProofForge.Svm.Runtime.token2022TransferCheckedCpiGuard amount decimals
+
 
 /-- Host-side view of a successfully parsed mint-close authority pubkey (32 raw bytes). -/
 structure MintCloseAuthority where

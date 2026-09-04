@@ -2501,6 +2501,9 @@ private def asAccountDataPolicy (e : Expr) :
     else if isConstNamed p ``ProofForge.Svm.Cpi.TokenTlv.Policy.token2022PausableMint ||
         endsWith p ".token2022PausableMint" then
       some (some .token2022PausableMint)
+    else if isConstNamed p ``ProofForge.Svm.Cpi.TokenTlv.Policy.token2022CpiGuardAccount ||
+        endsWith p ".token2022CpiGuardAccount" then
+      some (some .token2022CpiGuardAccount)
     else none
   else none
 

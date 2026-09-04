@@ -34,6 +34,7 @@ def entries : Array Entry := #[
   { name := "Token2022Tfee", digest := "9fa8422c103688b5" },
   { name := "HaltLog", digest := "2180b645ab5ac664" },
   { name := "Token2022Pause", digest := "7e354a73c6b794c3" },
+  { name := "Token2022CpiGuard", digest := "327a18cb7cad3696" },
   { name := "Ata", digest := "574dc90c21ca9723" },
   { name := "Rent", digest := "831e5502b9b3cfe5" },
   { name := "RentTopUp", digest := "389be3285e53c93d" },

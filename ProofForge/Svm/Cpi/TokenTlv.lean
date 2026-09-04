@@ -103,6 +103,12 @@ def nonTransferableType : UInt64 := 9
 /-- Official `ExtensionType::NonTransferableAccount` ordinal (account-side zero-byte marker). -/
 def nonTransferableAccountType : UInt64 := 13
 
+/-- Official `ExtensionType::CpiGuard` ordinal (account-side; 1-byte body). -/
+def cpiGuardType : UInt64 := 11
+
+/-- Official `CpiGuard` body length: lock_cpi flag (1). -/
+def cpiGuardBodyLen : UInt64 := 1
+
 /-- Official `ExtensionType::Pausable` ordinal (mint-side; 33-byte body). -/
 def pausableType : UInt64 := 26
 
@@ -231,6 +237,12 @@ inductive Policy where
   program; every other extension stays fail closed.
   -/
   | token2022PausableMint
+  /--
+  Account-only policy accepting exactly one official `CpiGuard` (ordinal 11, 1-byte body)
+  and then an end marker. The lock flag itself is consulted by the token program over the
+  CPI boundary; every other extension stays fail closed.
+  -/
+  | token2022CpiGuardAccount
   deriving BEq, DecidableEq, Repr, Inhabited
 
 /-! ## Typed target plan -/
@@ -269,6 +281,7 @@ def planFor : Policy → Except String Plan
   | .token2022TransferFeeConfigMint => .ok mintPlan
   | .token2022TransferFeeAmountAccount => .ok accountPlan
   | .token2022PausableMint => .ok mintPlan
+  | .token2022CpiGuardAccount => .ok accountPlan
 
 def Plan.wellFormed (plan : Plan) : Bool :=
   plan.baseLen + plan.paddingBytes + 1 == tlvStart &&
@@ -450,6 +463,10 @@ def transferFeeAmountAccountAccept? (t : UInt64) : Bool :=
 def pausableMintAccept? (t : UInt64) : Bool :=
   t == pausableType
 
+/-- Accept only official `CpiGuard` (ordinal 11). -/
+def cpiGuardAccountAccept? (t : UInt64) : Bool :=
+  t == cpiGuardType
+
 
 /-- Classifier selected by the closed policy vocabulary. -/
 def acceptFor : Policy → (UInt64 → Bool)
@@ -461,6 +478,7 @@ def acceptFor : Policy → (UInt64 → Bool)
   | .token2022TransferFeeConfigMint => transferFeeConfigMintAccept?
   | .token2022TransferFeeAmountAccount => transferFeeAmountAccountAccept?
   | .token2022PausableMint => pausableMintAccept?
+  | .token2022CpiGuardAccount => cpiGuardAccountAccept?
 /-- Fixed official body length required when a policy accepts a type; `none` means reject. -/
 def requiredBodyLen? : Policy → UInt64 → Option UInt64
   | .token2022MintClose, t =>
@@ -477,6 +495,8 @@ def requiredBodyLen? : Policy → UInt64 → Option UInt64
       if t == transferFeeAmountType then some transferFeeAmountBodyLen else none
   | .token2022PausableMint, t =>
       if t == pausableType then some pausableBodyLen else none
+  | .token2022CpiGuardAccount, t =>
+      if t == cpiGuardType then some cpiGuardBodyLen else none
   | .token2022Base _, _ => none
 
 /--
@@ -566,6 +586,7 @@ theorem planFor_yields_wellFormed : ∀ p, ∃ plan, planFor p = .ok plan ∧ pl
   | token2022TransferFeeConfigMint => exact ⟨mintPlan, rfl, mintPlan_wellFormed⟩
   | token2022TransferFeeAmountAccount => exact ⟨accountPlan, rfl, accountPlan_wellFormed⟩
   | token2022PausableMint => exact ⟨mintPlan, rfl, mintPlan_wellFormed⟩
+  | token2022CpiGuardAccount => exact ⟨accountPlan, rfl, accountPlan_wellFormed⟩
 /-- The classifier partitions every ordinal into the three official shapes. -/
 theorem classify_total (t : UInt64) :
     classify t = .endMarker ∨ (∃ t', classify t = .known t') ∨ (∃ t', classify t = .unknown t') := by

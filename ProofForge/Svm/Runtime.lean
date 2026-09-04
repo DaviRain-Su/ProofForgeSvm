@@ -750,6 +750,25 @@ def token2022TransferCheckedPausable (amount : UInt64) (decimals : UInt64) : UIn
       { acc := 0, signer := true, writable := false }]
     #[.u8le 12, .u64le amount, .u8le decimals]
 
+/--
+Token-2022 `TransferChecked` whose source account carries exactly one official `CpiGuard`
+extension entry (1-byte lock flag). The emitted preflight checks entry admission
+byte-exactly before any persistent write or CPI. The lock flag itself is consulted by the
+token program over the CPI boundary: this program's CPI always runs at stack height ≥ 2,
+so a locked source account is rejected on-chain with the official
+`CpiGuardTransferBlocked` terminal — the recipe never bypasses the guard.
+-/
+def token2022TransferCheckedCpiGuard (amount : UInt64) (decimals : UInt64) : UInt64 :=
+  invoke 4
+    #[{ acc := 1, signer := false, writable := true,
+        accountData := some .token2022CpiGuardAccount },
+      { acc := 2, signer := false, writable := false,
+        accountData := some (.token2022Base .mint) },
+      { acc := 3, signer := false, writable := true,
+        accountData := some (.token2022Base .account) },
+      { acc := 0, signer := true, writable := false }]
+    #[.u8le 12, .u64le amount, .u8le decimals]
+
 
 /--
 Token-2022 `TransferChecked` for the classic-compatible base slice, guarded by the bounded
