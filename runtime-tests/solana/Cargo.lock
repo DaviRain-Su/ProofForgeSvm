@@ -1811,6 +1811,7 @@ name = "proofforge-runtime-tests"
 version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
+ "bincode",
  "bytemuck",
  "hex",
  "lib-sokoban",
@@ -1824,6 +1825,7 @@ dependencies = [
  "solana-hash 4.2.0",
  "solana-instruction",
  "solana-native-token",
+ "solana-nonce",
  "solana-program-error",
  "solana-pubkey 4.1.0",
  "solana-rent",

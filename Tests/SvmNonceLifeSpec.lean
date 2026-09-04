@@ -32,6 +32,14 @@ elab "#pf_guard_nonce_life_ir" : command => do
       | _ => false
   unless hasInvoke initMethod.ops 3 do
     throwError s!"initNonce CPI was not retained: {repr initMethod.ops}"
+  let checkEntry (ixName : String) (n : Nat) : CommandElabM Unit := do
+    let some method := program.methods.find? (·.ixName == ixName)
+      | throwError s!"missing NonceLife {ixName} method"
+    unless hasInvoke method.ops n do
+      throwError s!"{ixName} CPI was not retained: {repr method.ops}"
+  checkEntry "reauthNonce" 3
+  checkEntry "upgradeNonce" 1
+  checkEntry "withdrawNonce" 5
   let some openMethod := program.methods.find? (·.ixName == "openNonce")
     | throwError "missing NonceLife openNonce method"
   -- createRentExempt computes the rent via sol_get_rent_sysvar, so the lamports word is
@@ -69,7 +77,7 @@ private def expectCanonical (module : Name) (expected : String) : CommandElabM U
     throwError s!"{module}: nonce-life facade changed canonical IR: {actual}"
 
 elab "#pf_guard_nonce_life_digest" : command => do
-  expectCanonical `Examples.Svm.NonceLife "43a8c37e4bc90e8f"
+  expectCanonical `Examples.Svm.NonceLife "4f6f1de5dac12ee4"
 
 #pf_guard_nonce_life_digest
 

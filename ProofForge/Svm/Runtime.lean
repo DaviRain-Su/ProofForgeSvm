@@ -1151,34 +1151,41 @@ def systemInitializeNonce : UInt64 :=
     #[.u32le 6, .accKey 0]
 
 /--
-`system.withdrawNonceAccount`：从外部账户 1(nonce)提走 lamports 到外部账户 2。
-外层：state(0 s) / nonce(1 w) / dest(2 w) / System(3)。数据：u32 tag 5 + lamports u64。
+`system.withdrawNonceAccount`：从非ce 账户(外层 2)提走 lamports 到外部账户 3。
+外层：state(0) / authority(1 s) / nonce(2 w) / dest(3 w) / recent(4 r) / rent(5 r) /
+System(6)。CPI 账户序 [nonce, dest, recent, rent, authority(signer)]，数据 u32 tag 5 +
+lamports u64。
 -/
 def systemWithdrawNonce (lamports : UInt64) : UInt64 :=
-  invoke 3
+  invoke 5
     #[{ acc := 1, signer := false, writable := true },
       { acc := 2, signer := false, writable := true },
+      { acc := 3, signer := false, writable := false },
+      { acc := 4, signer := false, writable := false },
       { acc := 0, signer := true, writable := false }]
     #[.u32le 5, .u64le lamports]
 
 /--
-`system.authorizeNonceAccount`：把外部账户 1(nonce)的授权人改成外层签名者。
-外层：state(0 s) / nonce(1 w) / System(2)。数据：u32 tag 7 + authorized(32 字节，取自
-外部账户 0 的 key)。
+`system.authorizeNonceAccount`：把 nonce 账户的授权人改成外部账户 3 的 key。
+外层：state(0) / current_authority(1 s) / nonce(2 w) / new_authority(3 r) / System(4)。
+CPI 账户序 [nonce, current_authority(signer)]，数据 u32 tag 7 + new authority(取自
+外部账户 3 的 key)。System 校验当前授权人(current_authority)已签名。
 -/
 def systemAuthorizeNonce : UInt64 :=
-  invoke 1
-    #[{ acc := 1, signer := false, writable := true }]
-    #[.u32le 7, .accKey 1]
+  invoke 3
+    #[{ acc := 1, signer := false, writable := true },
+      { acc := 0, signer := true, writable := false },
+      { acc := 2, signer := false, writable := false }]
+    #[.u32le 7, .accKey 3]
 
 /--
-`system.upgradeNonceAccount`：把外部账户 1 升级为当前 program 拥有的 nonce 账户。
-外层：state(0 s) / nonce(1 w) / System(2)。数据：u32 tag 12。
+`system.upgradeNonceAccount`：把非ce 账户从 `Versions::Legacy` 升级为 `Current`。
+外层：state(0) / nonce(1 w) / System(2)。CPI 单账户 [nonce(w)]，数据 u32 tag 12。
+System 校验 owner=system、writable、且 nonce data 是 Legacy(Initialized)。
 -/
 def systemUpgradeNonce : UInt64 :=
-  invoke 2
-    #[{ acc := 1, signer := false, writable := true },
-      { acc := 0, signer := true, writable := false }]
+  invoke 1
+    #[{ acc := 0, signer := false, writable := true }]
     #[.u32le 12]
 
 /--

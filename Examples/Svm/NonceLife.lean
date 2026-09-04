@@ -40,13 +40,35 @@ def initNonce (_s : State) : Except Error (State × UInt64) :=
     .error .overflow
 
 /--
-Authorize outer 0 as the new nonce authority. Outer accounts: state(0 s) / nonce(1 w) /
-System(2).
+Authorize external account 3 as the new nonce authority. Outer accounts: state(0) /
+nonce(1 w) / current_authority(2 s) / new_authority(3 r) / System(4).
 -/
 @[pf_entry]
 def reauthNonce (_s : State) : Except Error (State × UInt64) :=
   if (0 : UInt64) ≠ 1 then
     let _ := System.authorizeNonce
+    .ok ({ dummy := 0 }, 0)
+  else
+    .error .overflow
+
+/--
+Withdraw `lamports` from the nonce account (external 2) into external 3. Outer accounts:
+state(0) / authority(1 s) / nonce(2 w) / dest(3 w) / recent(4 r) / rent(5 r) / System(6).
+-/@[pf_entry]
+def withdrawNonce (_s : State) (lamports : UInt64) : Except Error (State × UInt64) :=
+  if (0 : UInt64) ≠ 1 then
+    let _ := System.withdrawNonce lamports
+    .ok ({ dummy := 0 }, lamports)
+  else
+    .error .overflow
+
+/--
+Upgrade the legacy `Versions::Legacy` nonce account at external account 1 to `Current`.
+Outer accounts: state(0) / nonce(1 w) / System(2).
+-/@[pf_entry]
+def upgradeNonce (_s : State) : Except Error (State × UInt64) :=
+  if (0 : UInt64) ≠ 1 then
+    let _ := System.upgradeNonce
     .ok ({ dummy := 0 }, 0)
   else
     .error .overflow
