@@ -2951,6 +2951,17 @@ private def decodeTelemetryCall (env : Environment) (e : Expr) :
   if (isConstNamed e ``ProofForge.Svm.Runtime.logComputeUnits ||
       endsWith e ".logComputeUnits") && args.isEmpty then
     some (.telemetry .logComputeUnits)
+  else if (isConstNamed e ``ProofForge.Svm.Runtime.log || endsWith e ".log") &&
+      args.size == 1 then
+    match strip args[args.size - 1]! with
+    | .lit (.strVal msg) => some (.telemetry (.log msg))
+    | _ => none
+  else if (isConstNamed e ``ProofForge.Svm.Runtime.panic || endsWith e ".panic") &&
+      args.isEmpty then
+    some (.telemetry .panic)
+  else if (isConstNamed e ``ProofForge.Svm.Runtime.abort || endsWith e ".abort") &&
+      args.isEmpty then
+    some (.telemetry .abort)
   else if (isConstNamed e ``ProofForge.Svm.Runtime.log64 || endsWith e ".log64") &&
       args.size == 5 then do
     let first ← val env args[args.size - 5]!
@@ -2962,6 +2973,7 @@ private def decodeTelemetryCall (env : Environment) (e : Expr) :
     if call.wellFormed (fun _ => true) then some (.telemetry call) else none
   else none
 
+/-- Restore the wrapped decodeLamportsCall that the earlier repair dropped. -/
 private def decodeLamportsCall (env : Environment) (e : Expr) :
     Option (Svm.Component.Call Ops.Val) :=
   let e := strip e

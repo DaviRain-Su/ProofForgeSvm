@@ -28,6 +28,26 @@ namespace ProofForge.Svm.Sdk.Telemetry
     (first second third fourth fifth : UInt64) : UInt64 :=
   ProofForge.Svm.Runtime.log64 first second third fourth fifth
 
+/-- Emit one UTF-8 program log line through `sol_log_`. The message is a compile-time string;
+the emitter places it in the ELF rodata pool, so no runtime pointer is formed. -/
+@[pf_inline] def log (message : String) : UInt64 :=
+  ProofForge.Svm.Runtime.log message
+
+/--
+Failing halt with the official `sol_panic_` terminal. Source code must treat every following
+statement as unreachable; the host stub's value is meaningless.
+-/
+@[pf_inline] def panic : UInt64 :=
+  ProofForge.Svm.Runtime.panic
+
+/--
+Failing halt with the official `abort` terminal, for compiler-internal unreachable paths.
+Same unreachable-after discipline as `panic`.
+-/
+@[pf_inline] def abort : UInt64 :=
+  ProofForge.Svm.Runtime.abort
+
+
 /-!
 ### sf-014：Telemetry L1 形状
 

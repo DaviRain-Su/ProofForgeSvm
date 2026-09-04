@@ -160,6 +160,7 @@ fail closed。常量 `acc < 64` 的账户 header 和四个 key / owner word 已�
 `Examples/Svm/SysXfer.lean` + `runtime-tests/solana/tests/sys_xfer.rs`：TransferWithSeed 从 `create_with_seed(acc0, "vault", program)` 转 lamports；缺 signer → `Custom(1)`。
 `Examples/Svm/TokenMint2.lean` + `runtime-tests/solana/tests/token_mint2.rs`：InitializeMint2 写 decimals=6、authority=acc0；authority 不要求 signer。
 `Examples/Svm/TokenNative.lean` + `runtime-tests/solana/tests/token_native.rs`：SyncNative 把 native 账户 amount 同步成多余 lamports；owner 不要求 signer。
+`Examples/Svm/HaltLog.lean` + `runtime-tests/solana/tests/halt_log.rs`：`sol_log_` 输出编译期 UTF-8 行（ELF `.rodata` 池，无运行时指针）；`sol_panic_`/`abort` 以官方 ABI（file/len/line/column=0）原子 halt，宿主侧分别为 `ProgramFailedToComplete`/`Abort` 终端。
 `Examples/Svm/Token2022Tfee.lean` + `runtime-tests/solana/tests/token_2022_tfee.rs`：transfer-fee mint 上 TransferChecked；费用按 `ceil(amount·bps/1e4)` 封顶收取（1%、cap 5000 时 1M → 5k；40k → 400），source/dest 必须带 `TransferFeeAmount` 扩展；clock epoch 推进后用 newer schedule；缺 signer → `Custom(1)`。
 `Examples/Svm/Token2022Ext.lean` + `runtime-tests/solana/tests/token_2022_ext.rs`：ImmutableOwner 账户的普通 TransferChecked 成功；NonTransferable mint/account 转账被 token-2022 拒绝（Custom 37）；ImmutableOwner 的 SetAuthority(AccountOwner) 被拒绝（Custom 34）。
 `Examples/Svm/Token2022.lean` + `runtime-tests/solana/tests/token_2022.rs`：Token-2022 base-layout TransferChecked 精确转账；缺 signer、transfer-fee mint、enabled transfer-hook mint 均原子失败。

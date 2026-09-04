@@ -39,6 +39,12 @@ def Query.canonical (renderValue : V → String) (operands : Array V) : Query �
 inductive Call (V : Type) where
   | logComputeUnits
   | log64 (first second third fourth fifth : V)
+  /-- UTF-8 `sol_log_` line; the payload is a compile-time string, not a runtime value. -/
+  | log (message : String)
+  /-- Failing halt `sol_panic_`. -/
+  | panic
+  /-- Failing halt `abort`. -/
+  | abort
   deriving BEq, Repr, Inhabited
 
 def Call.mapValues (mapValue : α → β) : Call α → Call β
@@ -46,16 +52,25 @@ def Call.mapValues (mapValue : α → β) : Call α → Call β
   | .log64 first second third fourth fifth =>
       .log64 (mapValue first) (mapValue second) (mapValue third) (mapValue fourth)
         (mapValue fifth)
+  | .log message => .log message
+  | .panic => .panic
+  | .abort => .abort
 
 def Call.mapValuesM [Monad m] (mapValue : α → m β) : Call α → m (Call β)
   | .logComputeUnits => return .logComputeUnits
   | .log64 first second third fourth fifth =>
       return .log64 (← mapValue first) (← mapValue second) (← mapValue third)
         (← mapValue fourth) (← mapValue fifth)
+  | .log message => return .log message
+  | .panic => return .panic
+  | .abort => return .abort
 
 def Call.values : Call V → Array V
   | .logComputeUnits => #[]
   | .log64 first second third fourth fifth => #[first, second, third, fourth, fifth]
+  | .log _ => #[]
+  | .panic => #[]
+  | .abort => #[]
 
 def Call.effects (_call : Call V) : AccountStorage.EffectSummary := {}
 
@@ -70,5 +85,8 @@ def Call.canonical (renderValue : V → String) : Call V → String
   | .log64 first second third fourth fifth =>
       s!"telemetry.log64({renderValue first},{renderValue second},{renderValue third}," ++
         s!"{renderValue fourth},{renderValue fifth})"
+  | .log message => s!"telemetry.log({message})"
+  | .panic => "telemetry.panic"
+  | .abort => "telemetry.abort"
 
 end ProofForge.Svm.Telemetry

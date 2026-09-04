@@ -5238,7 +5238,40 @@ raw_self_entry:
   exit
 "
 
-/-- Emit assembly from the fully lowered, target-owned SVM IR. -/
+private def splitLines (text : String) : List String := text.splitOn "\n"
+
+/--
+Gather the inline `.section rodata` fragments the telemetry `sol_log_` emitter sprinkles
+through program text into one trailing `.rodata` block, as the `sbpf` assembler's grammar
+requires (it rejects section switches mid-`.text`). Applied to the fully assembled `.s`
+file, not to individual handler bodies.
+-/
+def collectRoData (text : String) : String :=
+  Id.run do
+    let lines := (text.splitOn "\n").toArray
+    let mut pool : Array String := #[]
+    let mut kept : Array String := #[]
+    let mut i : Nat := 0
+    let mut inFragment : Bool := false
+    while h : i < lines.size do
+      let line := lines[i]
+      if line == "  .section rodata" then
+        inFragment := true
+        i := i + 1
+      else if line == "  .text" && inFragment then
+        inFragment := false
+        i := i + 1
+      else if inFragment then
+        pool := pool.push line
+        i := i + 1
+      else
+        kept := kept.push line
+        i := i + 1
+    if pool.isEmpty then text
+    else
+      String.intercalate "\n" kept.toList ++ "\n.rodata\n" ++
+        String.intercalate "\n" pool.toList ++ "\n  .text\n"
+
 def emitAsm (program : IR.Program) : Except String String := do
   unless IR.isProgramShape program do
     throw "extract/unsupported: not program shape"
@@ -5348,6 +5381,7 @@ entrypoint:
   exit
 {dispatchTxt}
 {handlers}{natSubHelper}"
+
 
 /-- Native SVM entry point from the combined extractor dialect. -/
 def emitProgramAsm (program : Extract.IR.Program) : Except String String := do

@@ -85,6 +85,7 @@ import Examples.Svm.RentTopUp
 import Examples.Svm.Token2022MintClose
 import Examples.Svm.Token2022Ext
 import Examples.Svm.Token2022Tfee
+import Examples.Svm.HaltLog
 import Examples.Svm.TransientPubkeyBatch
 import Examples.Svm.TransientPubkeyRing
 import Examples.Svm.HashWords

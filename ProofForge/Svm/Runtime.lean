@@ -89,6 +89,31 @@ programs bind these leaves to the exact official syscall symbols through `Svm.Te
   0
 
 /--
+UTF-8 program log line. Extracted programs emit `sol_log_`; the host stub is irreducible and
+returns 0. The string is compile-time in the emitter's view (the extractor accepts a literal),
+so no allocation or pointer escapes the source surface.
+-/
+@[irreducible] def log (message : String) : UInt64 :=
+  let _ := message
+  0
+
+/--
+Failing halt with file/line/column diagnostic (`sol_panic_`). The extracted program stops with
+the official panic terminal; the host stub models the stop as an unreachable irreducible —
+callers must not rely on its result.
+-/
+@[irreducible] def panic : UInt64 :=
+  0
+
+/--
+Failing halt for compiler-internal UB (`abort`). Same terminal discipline as `panic`; extracted
+programs emit the official `abort` static syscall.
+-/
+@[irreducible] def abort : UInt64 :=
+  0
+
+
+/--
 Reverse the eight bytes of one `u64`. The source body gives host evaluation its exact semantics;
 the SVM extractor preserves the call as one value intrinsic and the emitter lowers it to sBPF
 `be64`. This uses registers and fixed stack scratch only; it does not allocate heap memory.

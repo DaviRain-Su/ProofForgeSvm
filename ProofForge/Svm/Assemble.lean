@@ -89,6 +89,6 @@ def assembleIRProgram (outDir : System.FilePath) (program : IR.Program) : IO Res
   let asm ← match Emit.emitAsm program with
     | .error reason => throw <| IO.userError reason
     | .ok text => pure text
-  assembleOutput outDir program.name asm (Idl.emitProgramIdl program)
+  assembleOutput outDir program.name (Emit.collectRoData asm) (Idl.emitProgramIdl program)
 
 end ProofForge.Svm.Assemble
