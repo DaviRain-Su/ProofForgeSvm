@@ -8,9 +8,11 @@ import ProofForge.Svm.TransientVec
 /-!
 `svm-sdk-004` resource-manifest gate checks.
 
-Same-kind transient handles stay compile-time bounded. The default program budget remains two
-slots per kind; declaring more than `maxHandleSlots` fails closed until deep-scratch relayout.
-No runtime-dynamic slot count and no half-open third-handle SDK surface.
+Same-kind transient handles stay compile-time bounded. The packed deep-scratch layout derives
+from the manifest: the historical 2+2 default reproduces the fixed emitter offsets, and
+declaring more slots extends the same region upward until the packed end crosses the
+account-storage temporal-reuse boundary at 2680. No runtime-dynamic slot count and no
+half-open third-handle SDK surface.
 -/
 
 namespace Tests.SvmTransientResourceManifestSpec
@@ -20,9 +22,9 @@ open ProofForge.Svm
 open ProofForge.Svm.Sdk.Transient
 
 -- Default budget matches the historical two-slot packed layout.
+#guard defaultManifest.vectorSlots == 2
+#guard defaultManifest.bytesSlots == 2
 #guard defaultManifest.wellFormed
-#guard defaultManifest.vectorSlots == maxHandleSlots
-#guard defaultManifest.bytesSlots == maxHandleSlots
 #guard defaultManifest.admitsVectorSlot 0
 #guard defaultManifest.admitsVectorSlot 1
 #guard !defaultManifest.admitsVectorSlot 2
@@ -30,9 +32,20 @@ open ProofForge.Svm.Sdk.Transient
 #guard defaultManifest.admitsBytesSlot 1
 #guard !defaultManifest.admitsBytesSlot 2
 
--- Declaring a third same-kind slot is ill-formed today (manifest-first, no live third bank).
-#guard !({ vectorSlots := 3, bytesSlots := 2 } : ResourceManifest).wellFormed
-#guard !({ vectorSlots := 2, bytesSlots := 3 } : ResourceManifest).wellFormed
+-- The historical manifest reproduces the emitter's fixed offsets exactly.
+#guard defaultManifest.vectorSlotBase 0 == TransientVec.pointerStack
+#guard defaultManifest.vectorSlotBase 1 == TransientVec.pointerStack + slotStride
+#guard defaultManifest.bytesSlotBase 0 == TransientBytes.pointerStack
+#guard defaultManifest.bytesSlotBase 1 == TransientBytes.pointerStack + slotStride
+#guard defaultManifest.descriptorBase + 16 == TransientBytes.descriptorStack
+
+-- Shared deep-scratch budget: 2+2 and 3+2 and 2+3 fit; 3+3 and 4+2 cross the
+-- account-storage temporal-reuse boundary and fail closed.
+#guard ({ vectorSlots := 3, bytesSlots := 2 } : ResourceManifest).wellFormed
+#guard ({ vectorSlots := 2, bytesSlots := 3 } : ResourceManifest).wellFormed
+#guard !({ vectorSlots := 3, bytesSlots := 3 } : ResourceManifest).wellFormed
+#guard !({ vectorSlots := 4, bytesSlots := 2 } : ResourceManifest).wellFormed
+#guard !({ vectorSlots := 2, bytesSlots := 4 } : ResourceManifest).wellFormed
 #guard !({ vectorSlots := 0, bytesSlots := 2 } : ResourceManifest).wellFormed
 #guard !({ vectorSlots := 2, bytesSlots := 0 } : ResourceManifest).wellFormed
 
@@ -43,7 +56,8 @@ def oneVector : ResourceManifest := { vectorSlots := 1, bytesSlots := 2 }
 #guard !oneVector.admitsVectorSlot 1
 #guard oneVector.admitsBytesSlot 1
 
--- Config gates compose the manifest: historical slots stay open; slot ≥ 2 fails closed.
+-- Config gates compose the manifest: historical slots stay open; slot >= 2 needs a manifest
+-- that admits it.
 def vectorSlot0 : TransientVec.Config := { capacity := 4 }
 def vectorSlot1 : TransientVec.Config := { capacity := secondSlotWord 4 }
 def vectorSlot2 : TransientVec.Config := { capacity := slotWord 4 2 }
@@ -61,8 +75,8 @@ def bytesSlot2 : TransientBytes.Config := { capacity := slotWord 16 2 }
 #guard handleSlot (slotWord 4 2) == 2
 #guard handlePayload (slotWord 4 2) == 4
 
-#guard maxHandleSlots == 2
--- Historical two-slot facades remain the only same-kind openers.
+#guard maxHandleSlots == 5
+-- Historical two-slot facades remain the only same-kind openers at the default manifest.
 #guard TransientVec.Config.wellFormed (Vector64.bounded 4)
 #guard TransientVec.Config.wellFormed (Vector64.boundedAlt 4)
 #guard TransientBytes.Config.wellFormed (Bytes.bounded 16)

@@ -53,9 +53,9 @@ def Config.fixedVec (config : Config) : FixedVec :=
     elementBytes := 8
     capacity := config.payload }
 
-/-- Geometry gate under the default two-slot resource manifest (`svm-sdk-004`). A future
-program-attached manifest can tighten this further; declaring more than two slots remains
-ill-formed until deep-scratch relayout. -/
+/-- Geometry gate under the default two-slot resource manifest (`svm-sdk-004`). An explicit
+manifest admits more same-kind slots: this gate checks the manifest's shared deep-scratch
+budget and rejects slots the manifest does not admit. -/
 def Config.wellFormed (config : Config) (manifest : ResourceManifest := defaultManifest) : Bool :=
   manifest.admitsVectorSlot config.slot && config.fixedVec.wellFormed
 

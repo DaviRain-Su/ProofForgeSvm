@@ -10,12 +10,13 @@ payload allocation is invocation-only, growth never reallocates, and `finish` do
 Solana bump heap. OOM, full capacity, out-of-bounds access, and stale handles are explicit terminal
 program errors. No source or account value can contain the native pointer.
 
-Two same-kind compile-time handles can be active in one invocation: `bounded` opens the historical
-slot 0 and `boundedAlt` opens slot 1. Both slots decode to the same runtime leaves — the slot rides
-inside the compiler-erased capacity word shared by the whole `Sdk.Transient` — and each owns a
-private metadata bank and disjoint payload region while the other stays live. Additional same-kind
-slots require a well-formed `ResourceManifest` and a future scratch remapping; the default budget
-stays two (`svm-sdk-004`).
+Same-kind compile-time handles can be active in one invocation: `bounded` opens the historical
+slot 0 and `boundedAlt` opens slot 1. Both slots decode to the same runtime leaves — the slot
+rides inside the compiler-erased capacity word shared by the whole `Sdk.Transient` — and each
+owns a private metadata bank and disjoint payload region while the others stay live. A
+well-formed `ResourceManifest` admits additional same-kind slots: the manifest-driven
+deep-scratch layout packs each slot's bank inside the FIFO-to-account-storage window
+(`svm-sdk-004`).
 -/
 
 namespace ProofForge.Svm.Sdk.Transient

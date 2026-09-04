@@ -212,7 +212,7 @@ elab "#pf_guard_transient_bytes" : command => do
   let some withVector := program.methods.find? (·.ixName == "vectorWithBytes")
     | throwError "missing vectorWithBytes method"
   unless filtered taggedStep withVector ==
-      #["v.begin", "b.begin", "b.push", "v.push", "b.get", "v.get", "v.finish", "b.finish"] do
+      #["v.begin", "b.begin", "b.push", "v.push", "b.query", "v.query", "v.finish", "b.finish"] do
     throwError "vectorWithBytes did not interleave both handles in source order"
   let accountSource ←
     match ProofForge.Extract.extractModuleIR env `Examples.Svm.AccountView with
@@ -238,24 +238,27 @@ elab "#pf_guard_transient_bytes" : command => do
       asm.contains "transient_bytes_truncate_done_" &&
       asm.contains "transient_bytes_pop_nonempty_" &&
       asm.contains "one sol_log_data field views the active 12-byte payload buffer" &&
-      asm.contains "call sol_log_data" &&
+      asm.contains "call sol_log_data" && asm.contains "add64 r9, -2648" &&
       asm.contains "stxdw [r9 + 0], r1" && asm.contains "stxdw [r9 + 8], r1" &&
       asm.contains "stxb [r9 + 0], r1" &&
       asm.contains "lddw r0, 0x1211" && asm.contains "lddw r0, 0x1212" &&
       asm.contains "lddw r0, 0x1213" && asm.contains "lddw r0, 0x1214" do
     throwError "bounded byte allocator, mutation, canonical range, or explicit failure gates are missing"
-  -- The dedicated multi-handle program: same-kind second-slot metadata cells (pointer 2432,
-  -- length 2440, active 2456) back the shared lifecycle, below the unchanged
-  -- `sol_log_data` descriptor window at 2649..2664.
+  -- The dedicated multi-handle program: same-kind second-slot metadata cells (pointer 2600,
+  -- length 2608, active 2624) back the shared lifecycle, below the unchanged
+  -- `sol_log_data` descriptor window at 2633..2648 (emitted by the MemoryOps program's
+  -- `bytesLogData`, checked above).
   let pairAsm ←
     match ProofForge.Svm.Emit.emitAsm pairProgram with
     | .ok asm => pure asm
     | .error reason => throwError reason
-  unless pairAsm.contains "ldxdw r9, [r10 - 2432]" && pairAsm.contains "ldxdw r2, [r10 - 2440]" &&
-      pairAsm.contains "stxdw [r10 - 2440], r2" &&
-      pairAsm.contains "stxb [r10 - 2432]" == false do
+  unless pairAsm.contains "ldxdw r9, [r10 - 2600]" && pairAsm.contains "ldxdw r2, [r10 - 2608]" &&
+      pairAsm.contains "stxdw [r10 - 2608], r2" &&
+      pairAsm.contains "stxb [r10 - 2600]" == false do
     throwError "same-kind second-slot byte metadata cells are missing"
-  unless pairAsm.contains "add64 r9, -2664" && pairAsm.contains "lddw r0, 0x1213" do
-    throwError "second-slot byte handles did not keep the descriptor and state gates"
+  unless pairAsm.contains "lddw r0, 0x1213" do
+    throwError "second-slot byte handles did not keep the state gate"
 
 end Tests.SvmTransientBytesSpec
+
+#pf_guard_transient_bytes

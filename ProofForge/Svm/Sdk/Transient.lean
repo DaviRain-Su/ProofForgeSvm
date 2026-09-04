@@ -22,20 +22,46 @@ namespace ProofForge.Svm.Sdk.Transient
 
 /-! ## Reusable multi-handle identity -/
 
-/--
-Compile-time handle slots for one transient container kind. Every bounded transient kind owns two
-slots; each slot owns a private metadata bank (`Svm.Transient.Emit.slotCell`: four 8-byte cells,
-`Svm.Transient.Emit.slotStride` bytes apart) and its own disjoint `begin` allocation from the
-shared official downward bump heap. Simultaneous same-kind handles therefore never alias metadata
-or payload, while `begin` on the same slot is the historical re-open that replaces that slot's
-metadata only.
+/-!
+Compile-time handle slots for one transient container kind. Every bounded transient kind owns
+`ResourceManifest`-declared slots (two per kind by default); each slot owns a private metadata
+bank (`Svm.Transient.Emit.slotCell`: four 8-byte cells, `Svm.Transient.Emit.slotStride` bytes
+apart) and its own disjoint `begin` allocation from the shared official downward bump heap.
+Simultaneous same-kind handles therefore never alias metadata or payload, while `begin` on the
+same slot is the historical re-open that replaces that slot's metadata only.
 
 Handle identity never reaches top-level Ops, IR, the main emitter, or the runtime-leaf signature:
 the single compiler-erased `capacity` word keeps the historical plain-payload encoding for slot 0
 and packs the slot index above bit 32 for slot 1, so extraction still decodes one static literal
 per operation and the target component splits the word back into capacity and slot.
 -/
-def maxHandleSlots : Nat := 2
+
+/-! ## Handle slots -/
+
+/-- Deep-scratch bytes per same-kind handle slot (four 8-byte metadata cells). Must match
+`Svm.Transient.Emit.slotStride`. -/
+def slotStride : Nat := 32
+
+/-- Deep-scratch bytes reserved above the same-kind slot banks for the shared
+`sol_log_data` descriptor that the Bytes `logData` call builds: a 16-byte
+descriptor (payload pointer + current length). -/
+def descriptorBudget : Nat := 16
+
+/-- Deep-scratch window available to transient metadata: FIFO query scratch ends at 2496, and
+the account-storage scratch's temporal-reuse claim starts at 2680, so transient metadata packs
+from 2496 upward. The historical 2+2 manifest packs to exactly 2632..2648; declaring more slots
+extends the same region upward toward 2680. -/
+def transientLowWater : Nat := 2496
+def transientHighWater : Nat := 2680
+
+/--
+Maximum same-kind handle slots the deep-scratch window supports. The window is
+`transientHighWater - transientLowWater`; each Vector slot and each Bytes slot takes one
+`slotStride` bank, and the shared descriptor takes `descriptorBudget`. The budget is shared
+across kinds: the sum of both kinds' slots must fit.
+-/
+def maxHandleSlots : Nat :=
+  (transientHighWater - transientLowWater - descriptorBudget) / slotStride
 
 /-- Bit weight of the slot field inside the compiler-erased handle word. -/
 @[pf_inline] def handleSlotBit : Nat := 4294967296
@@ -59,28 +85,63 @@ def slotWord (payload slot : Nat) : Nat := payload + slot * handleSlotBit
 
 /-! ## Resource manifest (`svm-sdk-004`)
 
-Same-kind transient handles stay compile-time bounded. The default program budget is still two
-slots per kind (the packed deep-scratch layout from R3-021). Programs may declare an explicit
-`ResourceManifest`; declaring more than two slots is currently **ill-formed** until a follow-up
-scratch-relayout slice lands. There is no runtime-dynamic slot count and no half-open third handle.
+Same-kind transient handles stay compile-time bounded. The manifest declares per-kind slot
+counts; the packed deep-scratch layout derives from the manifest and fails closed at the
+account-storage temporal-reuse boundary. Programs declare an explicit `ResourceManifest` when
+they need more than the historical two slots per kind.
 -/
 
 /-- Compile-time per-program transient slot budget. Defaults preserve the historical two-slot
-ceiling; values above `maxHandleSlots` fail `wellFormed` until deep-scratch geometry is remapped. -/
+ceiling per kind. -/
 structure ResourceManifest where
-  vectorSlots : Nat := maxHandleSlots
-  bytesSlots : Nat := maxHandleSlots
+  vectorSlots : Nat := 2
+  bytesSlots : Nat := 2
   deriving BEq, Repr, Inhabited
 
-/-- Historical default: two Vector64 slots and two Bytes slots. -/
-def defaultManifest : ResourceManifest := {}
+/-- Historical default: two Vector64 slots and two Bytes slots. Its packed layout reproduces
+the emitter offsets today exactly: Vector slots at `2504`/`2536`, Bytes slots at
+`2568`/`2600`, descriptor base `2632` (`descriptorStack = 2648`). -/
+def defaultManifest : ResourceManifest := { vectorSlots := 2, bytesSlots := 2 }
+/-- Historical two-per-kind manifest alias (`svm-sdk-004`). -/
+def historicalManifest : ResourceManifest := defaultManifest
 
-/-- A manifest is well-formed when every declared kind stays within the currently mapped scratch
-ceiling (`maxHandleSlots`) and keeps at least one slot. Requests for a third same-kind slot fail
-closed here rather than emitting a half-open handle API. -/
+/-- Deep-scratch end offset of the Vector slot region for this manifest. Slot `k` banks at
+`transientLowWater + k * slotStride .. + slotStride` (exclusive). The historical manifest
+maps slot 0 to `2504..2535` and slot 1 to `2536..2567`. -/
+def ResourceManifest.vectorSlotBase (manifest : ResourceManifest) (slot : Nat) : Nat :=
+  transientLowWater + slot * slotStride + 8
+
+/-- Deep-scratch end offset of the Vector slot region (exclusive): the base offset of the
+first Bytes slot. -/
+def ResourceManifest.vectorEnd (manifest : ResourceManifest) : Nat :=
+  manifest.vectorSlotBase manifest.vectorSlots
+
+/-- Bytes slot `k` banks densely above the Vector region: base `vectorEnd + slot * slotStride`.
+The historical manifest keeps slot 0 at the fixed `2568` and slot 1 at `2600` that today's
+emitter offsets use. -/
+def ResourceManifest.bytesSlotBase (manifest : ResourceManifest) (slot : Nat) : Nat :=
+  manifest.vectorEnd + slot * slotStride
+
+def ResourceManifest.bytesEnd (manifest : ResourceManifest) : Nat :=
+  manifest.bytesSlotBase manifest.bytesSlots
+
+/-- Base stack offset of the shared `sol_log_data` descriptor: immediately above the Bytes
+region. The historical manifest maps this to `2632`, with `descriptorStack = base + 16 = 2648`. -/
+def ResourceManifest.descriptorBase (manifest : ResourceManifest) : Nat :=
+  manifest.bytesEnd
+
+/-- Deep-scratch end offset including the shared descriptor (exclusive). -/
+def ResourceManifest.packedEnd (manifest : ResourceManifest) : Nat :=
+  manifest.descriptorBase + descriptorBudget
+
+/-- A manifest is well-formed when every declared kind keeps at least one slot and the packed
+layout (both kinds' slots plus the shared descriptor) stays inside the deep-scratch window.
+The budget is shared across kinds: the sum of both kinds' slots must fit, and the historical
+2+2 default must reproduce today's fixed offsets exactly. -/
 def ResourceManifest.wellFormed (manifest : ResourceManifest) : Bool :=
-  0 < manifest.vectorSlots && manifest.vectorSlots ≤ maxHandleSlots &&
-    0 < manifest.bytesSlots && manifest.bytesSlots ≤ maxHandleSlots
+  0 < manifest.vectorSlots && 0 < manifest.bytesSlots &&
+    manifest.vectorSlots + manifest.bytesSlots ≤ maxHandleSlots &&
+    manifest.packedEnd ≤ transientHighWater
 
 /-- Slot index admitted by the manifest for Vector64-backed containers. -/
 def ResourceManifest.admitsVectorSlot (manifest : ResourceManifest) (slot : Nat) : Bool :=

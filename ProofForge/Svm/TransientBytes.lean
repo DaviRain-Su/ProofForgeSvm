@@ -21,12 +21,12 @@ namespace ProofForge.Svm.TransientBytes
 open Sdk.Transient
 
 /-- Deep invocation-only metadata, disjoint from FIFO's `2248..2496` cells and from
-`TransientVec`'s `2496..2559` cells. Slot 0 owns `2584..2615`; slot 1 owns `2616..2647`. These
+`TransientVec`'s `2496..2567` cells. Slot 0 owns `2568..2599`; slot 1 owns `2600..2631`. These
 cells may survive across ordinary component calls but never across invocations. -/
-def pointerStack : Nat := 2584
-def lengthStack : Nat := 2592
-def capacityStack : Nat := 2600
-def activeStack : Nat := 2608
+def pointerStack : Nat := 2568
+def lengthStack : Nat := 2576
+def capacityStack : Nat := 2584
+def activeStack : Nat := 2592
 
 /-- Distinct terminal errors let clients and runtime tests distinguish allocator OOM, bounds/full,
 byte-range, and handle-lifetime violations. -/
@@ -38,10 +38,10 @@ def rangeErrorCode : Nat := 0x1214
 /-- Deepest stack offset of the 16-byte `SolBytes` descriptor used by `sol_log_data`. Its base is
 `r10 - descriptorStack`; the target emitter stores the active payload pointer at `[base + 0]` and
 its current length at `[base + 8]`. The descriptor exists only adjacent to syscall emission; the
-pointer never enters a source value, generic IR, or account state. The occupied `2649..2664` bytes
-are disjoint from FIFO's `2248..2496`, `TransientVec`'s `2496..2559`, and `AccountStorage`'s
+pointer never enters a source value, generic IR, or account state. The occupied `2633..2648`
+bytes are disjoint from FIFO's `2248..2496`, `TransientVec`'s `2496..2567`, and `AccountStorage`'s
 deep scratch at `2680..4096`. -/
-def descriptorStack : Nat := 2664
+def descriptorStack : Nat := 2648
 
 /-- Compiler-erased byte-buffer geometry. The `capacity` field is the reusable `Sdk.Transient`
 handle word: byte capacity in its low 32 bits, handle slot above bit 32. -/
@@ -62,9 +62,9 @@ def Config.fixedVec (config : Config) : FixedVec :=
     elementBytes := 1
     capacity := config.payload }
 
-/-- Geometry gate under the default two-slot resource manifest (`svm-sdk-004`). A future
-program-attached manifest can tighten this further; declaring more than two slots remains
-ill-formed until deep-scratch relayout. -/
+/-- Geometry gate under the default two-slot resource manifest (`svm-sdk-004`). An explicit
+manifest admits more same-kind slots: this gate checks the manifest's shared deep-scratch
+budget and rejects slots the manifest does not admit. -/
 def Config.wellFormed (config : Config) (manifest : ResourceManifest := defaultManifest) : Bool :=
   manifest.admitsBytesSlot config.slot && config.fixedVec.wellFormed
 

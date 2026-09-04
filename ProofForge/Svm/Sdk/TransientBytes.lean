@@ -12,12 +12,13 @@ against the canonical `≤ 255` range, `appendLe64` writes exactly eight little-
 OOM, full capacity, out-of-bounds access, out-of-range byte values, and stale handles are explicit
 terminal program errors. The native pointer never reaches a source or account value.
 
-Two same-kind compile-time handles can be active in one invocation, alongside the two `Vector64`
-slots: `bounded` opens the historical slot 0 and `boundedAlt` opens slot 1. Both slots decode to
-the same runtime leaves — the slot rides inside the compiler-erased capacity word shared by the
+Same-kind compile-time handles can be active in one invocation, alongside the `Vector64` slots:
+`bounded` opens the historical slot 0 and `boundedAlt` opens slot 1. Both slots decode to the
+same runtime leaves — the slot rides inside the compiler-erased capacity word shared by the
 whole `Sdk.Transient` — and each owns a private metadata bank and disjoint payload region while
-the other handle stays live. Additional same-kind slots require a well-formed `ResourceManifest`
-and a future scratch remapping; the default budget stays two (`svm-sdk-004`).
+the other handles stay live. A well-formed `ResourceManifest` admits additional same-kind
+slots: the manifest-driven deep-scratch layout packs each slot's bank inside the
+FIFO-to-account-storage window (`svm-sdk-004`).
 -/
 
 namespace ProofForge.Svm.Sdk.Transient

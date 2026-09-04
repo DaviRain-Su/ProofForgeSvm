@@ -43,38 +43,38 @@ structure SlotBank where
   length : Nat := 0
   deriving BEq, Repr, Inhabited
 
-/-- Two independent handle slots plus per-slot payload words. -/
+/-- `maxHandleSlots` independent handle slots plus per-slot payload words. -/
 structure TransientWords where
-  bank : Fin 2 → SlotBank
-  words : Fin 2 → Nat → UInt64
+  bank : Fin maxHandleSlots → SlotBank
+  words : Fin maxHandleSlots → Nat → UInt64
 
 def empty : TransientWords :=
   { bank := fun _ => {}, words := fun _ _ => 0 }
 
-def slotOf (word : Nat) : Option (Fin 2) :=
+def slotOf (word : Nat) : Option (Fin maxHandleSlots) :=
   let s := handleSlot word
-  if h : s < 2 then some ⟨s, h⟩ else none
+  if h : s < maxHandleSlots then some ⟨s, h⟩ else none
 
 def payloadOf (word : Nat) : Nat := handlePayload word
 
-def setBank (tw : TransientWords) (slot : Fin 2) (b : SlotBank) : TransientWords :=
+def setBank (tw : TransientWords) (slot : Fin maxHandleSlots) (b : SlotBank) : TransientWords :=
   { tw with bank := upd tw.bank slot b }
 
-def setWord (tw : TransientWords) (slot : Fin 2) (i : Nat) (v : UInt64) : TransientWords :=
+def setWord (tw : TransientWords) (slot : Fin maxHandleSlots) (i : Nat) (v : UInt64) : TransientWords :=
   { tw with words := upd tw.words slot (upd (tw.words slot) i v) }
 
-def requireActive (tw : TransientWords) (slot : Fin 2) (cap : Nat) : Bool :=
+def requireActive (tw : TransientWords) (slot : Fin maxHandleSlots) (cap : Nat) : Bool :=
   let b := tw.bank slot
   b.active && decide (b.capacity = cap)
 
 /-! ## Vector64 operations -/
 
-def mVec64Begin (tw : TransientWords) (slot : Fin 2) (cap : Nat) : TransientWords × UInt64 :=
+def mVec64Begin (tw : TransientWords) (slot : Fin maxHandleSlots) (cap : Nat) : TransientWords × UInt64 :=
   if cap = 0 then (tw, stateCode)
   else
     (setBank tw slot { active := true, capacity := cap, length := 0 }, okCode)
 
-def mVec64Push (tw : TransientWords) (slot : Fin 2) (cap : Nat) (value : UInt64) :
+def mVec64Push (tw : TransientWords) (slot : Fin maxHandleSlots) (cap : Nat) (value : UInt64) :
     TransientWords × UInt64 :=
   if !requireActive tw slot cap then (tw, stateCode)
   else
@@ -84,7 +84,7 @@ def mVec64Push (tw : TransientWords) (slot : Fin 2) (cap : Nat) (value : UInt64)
       let tw := setWord tw slot b.length value
       (setBank tw slot { b with length := b.length + 1 }, okCode)
 
-def mVec64Set (tw : TransientWords) (slot : Fin 2) (cap : Nat) (index : Nat) (value : UInt64) :
+def mVec64Set (tw : TransientWords) (slot : Fin maxHandleSlots) (cap : Nat) (index : Nat) (value : UInt64) :
     TransientWords × UInt64 :=
   if !requireActive tw slot cap then (tw, stateCode)
   else
@@ -93,7 +93,7 @@ def mVec64Set (tw : TransientWords) (slot : Fin 2) (cap : Nat) (index : Nat) (va
     else
       (setWord tw slot index value, okCode)
 
-def mVec64Pop (tw : TransientWords) (slot : Fin 2) (cap : Nat) :
+def mVec64Pop (tw : TransientWords) (slot : Fin maxHandleSlots) (cap : Nat) :
     TransientWords × UInt64 :=
   if !requireActive tw slot cap then (tw, stateCode)
   else
@@ -104,18 +104,18 @@ def mVec64Pop (tw : TransientWords) (slot : Fin 2) (cap : Nat) :
       let v := tw.words slot i
       (setBank tw slot { b with length := i }, v)
 
-def mVec64Get (tw : TransientWords) (slot : Fin 2) (cap : Nat) (index : Nat) : UInt64 :=
+def mVec64Get (tw : TransientWords) (slot : Fin maxHandleSlots) (cap : Nat) (index : Nat) : UInt64 :=
   if !requireActive tw slot cap then stateCode
   else
     let b := tw.bank slot
     if index ≥ b.length then boundsCode
     else tw.words slot index
 
-def mVec64Length (tw : TransientWords) (slot : Fin 2) (cap : Nat) : UInt64 :=
+def mVec64Length (tw : TransientWords) (slot : Fin maxHandleSlots) (cap : Nat) : UInt64 :=
   if !requireActive tw slot cap then stateCode
   else UInt64.ofNat (tw.bank slot).length
 
-def mVec64Finish (tw : TransientWords) (slot : Fin 2) (cap : Nat) :
+def mVec64Finish (tw : TransientWords) (slot : Fin maxHandleSlots) (cap : Nat) :
     TransientWords × UInt64 :=
   if !requireActive tw slot cap then (tw, stateCode)
   else
@@ -123,38 +123,38 @@ def mVec64Finish (tw : TransientWords) (slot : Fin 2) (cap : Nat) :
 
 /-! ## Fail-closed -/
 
-theorem mVec64Push_stale (tw : TransientWords) (slot : Fin 2) (cap : Nat) (value : UInt64)
+theorem mVec64Push_stale (tw : TransientWords) (slot : Fin maxHandleSlots) (cap : Nat) (value : UInt64)
     (h : requireActive tw slot cap = false) :
     mVec64Push tw slot cap value = (tw, stateCode) := by
   simp [mVec64Push, h]
 
-theorem mVec64Push_full (tw : TransientWords) (slot : Fin 2) (cap : Nat) (value : UInt64)
+theorem mVec64Push_full (tw : TransientWords) (slot : Fin maxHandleSlots) (cap : Nat) (value : UInt64)
     (hact : requireActive tw slot cap = true)
     (hfull : (tw.bank slot).length ≥ cap) :
     mVec64Push tw slot cap value = (tw, boundsCode) := by
   simp [mVec64Push, hact, hfull]
 
-theorem mVec64Set_oob (tw : TransientWords) (slot : Fin 2) (cap : Nat) (index : Nat)
+theorem mVec64Set_oob (tw : TransientWords) (slot : Fin maxHandleSlots) (cap : Nat) (index : Nat)
     (value : UInt64)
     (hact : requireActive tw slot cap = true)
     (hoob : index ≥ (tw.bank slot).length) :
     mVec64Set tw slot cap index value = (tw, boundsCode) := by
   simp [mVec64Set, hact, hoob]
 
-theorem mVec64Pop_empty (tw : TransientWords) (slot : Fin 2) (cap : Nat)
+theorem mVec64Pop_empty (tw : TransientWords) (slot : Fin maxHandleSlots) (cap : Nat)
     (hact : requireActive tw slot cap = true)
     (hempty : (tw.bank slot).length = 0) :
     mVec64Pop tw slot cap = (tw, boundsCode) := by
   simp [mVec64Pop, hact, hempty]
 
-theorem mVec64Finish_stale (tw : TransientWords) (slot : Fin 2) (cap : Nat)
+theorem mVec64Finish_stale (tw : TransientWords) (slot : Fin maxHandleSlots) (cap : Nat)
     (h : requireActive tw slot cap = false) :
     mVec64Finish tw slot cap = (tw, stateCode) := by
   simp [mVec64Finish, h]
 
 /-! ## Push readback + slot isolation -/
 
-private theorem mVec64Push_eq (tw : TransientWords) (slot : Fin 2) (cap : Nat) (value : UInt64)
+private theorem mVec64Push_eq (tw : TransientWords) (slot : Fin maxHandleSlots) (cap : Nat) (value : UInt64)
     (hact : requireActive tw slot cap = true)
     (hroom : (tw.bank slot).length < cap) :
     mVec64Push tw slot cap value =
@@ -164,7 +164,7 @@ private theorem mVec64Push_eq (tw : TransientWords) (slot : Fin 2) (cap : Nat) (
   simp [mVec64Push, hact, hge]
 
 /-- Push succeeds and stores `value` at the old length; length advances by one. -/
-theorem mVec64Push_readback (tw : TransientWords) (slot : Fin 2) (cap : Nat) (value : UInt64)
+theorem mVec64Push_readback (tw : TransientWords) (slot : Fin maxHandleSlots) (cap : Nat) (value : UInt64)
     (hact : requireActive tw slot cap = true)
     (hroom : (tw.bank slot).length < cap) :
     let r := mVec64Push tw slot cap value
@@ -182,7 +182,7 @@ theorem mVec64Push_readback (tw : TransientWords) (slot : Fin 2) (cap : Nat) (va
     simp [hr, setBank, setWord, upd_same, this]
 
 /-- After a successful push, `mVec64Get` returns the stored value. -/
-theorem mVec64Push_get (tw : TransientWords) (slot : Fin 2) (cap : Nat) (value : UInt64)
+theorem mVec64Push_get (tw : TransientWords) (slot : Fin maxHandleSlots) (cap : Nat) (value : UInt64)
     (hact : requireActive tw slot cap = true)
     (hroom : (tw.bank slot).length < cap) :
     mVec64Get (mVec64Push tw slot cap value).1 slot cap (tw.bank slot).length = value := by
@@ -194,7 +194,7 @@ theorem mVec64Push_get (tw : TransientWords) (slot : Fin 2) (cap : Nat) (value :
     omega
   simp [mVec64Get, hact', hlen, hr.2.1]
 
-theorem mVec64Push_other_slot_unchanged (tw : TransientWords) (slot other : Fin 2)
+theorem mVec64Push_other_slot_unchanged (tw : TransientWords) (slot other : Fin maxHandleSlots)
     (cap : Nat) (value : UInt64)
     (hact : requireActive tw slot cap = true)
     (hroom : (tw.bank slot).length < cap)
@@ -211,7 +211,7 @@ theorem mVec64Push_other_slot_unchanged (tw : TransientWords) (slot other : Fin 
         (upd (tw.words slot) (tw.bank slot).length value)
     simpa [hr, setBank, setWord] using congrArg (fun f => f i) hw
 
-theorem mVec64Begin_finish_stale (tw : TransientWords) (slot : Fin 2) (cap : Nat)
+theorem mVec64Begin_finish_stale (tw : TransientWords) (slot : Fin maxHandleSlots) (cap : Nat)
     (hcap : cap ≠ 0) :
     let mid := (mVec64Begin tw slot cap).1
     let done := (mVec64Finish mid slot cap).1
@@ -235,28 +235,28 @@ structure BytesBank where
   deriving BEq, Repr, Inhabited
 
 structure BytesWords where
-  bank : Fin 2 → BytesBank
-  bytes : Fin 2 → Nat → UInt8
+  bank : Fin maxHandleSlots → BytesBank
+  bytes : Fin maxHandleSlots → Nat → UInt8
 
 def emptyBytes : BytesWords :=
   { bank := fun _ => {}, bytes := fun _ _ => 0 }
 
-def setBytesBank (bw : BytesWords) (slot : Fin 2) (b : BytesBank) : BytesWords :=
+def setBytesBank (bw : BytesWords) (slot : Fin maxHandleSlots) (b : BytesBank) : BytesWords :=
   { bw with bank := upd bw.bank slot b }
 
-def setByte (bw : BytesWords) (slot : Fin 2) (i : Nat) (v : UInt8) : BytesWords :=
+def setByte (bw : BytesWords) (slot : Fin maxHandleSlots) (i : Nat) (v : UInt8) : BytesWords :=
   { bw with bytes := upd bw.bytes slot (upd (bw.bytes slot) i v) }
 
-def requireBytesActive (bw : BytesWords) (slot : Fin 2) (cap : Nat) : Bool :=
+def requireBytesActive (bw : BytesWords) (slot : Fin maxHandleSlots) (cap : Nat) : Bool :=
   let b := bw.bank slot
   b.active && decide (b.capacity = cap)
 
-def mBytesBegin (bw : BytesWords) (slot : Fin 2) (cap : Nat) : BytesWords × UInt64 :=
+def mBytesBegin (bw : BytesWords) (slot : Fin maxHandleSlots) (cap : Nat) : BytesWords × UInt64 :=
   if cap = 0 then (bw, bytesStateCode)
   else
     (setBytesBank bw slot { active := true, capacity := cap, length := 0 }, okCode)
 
-def mBytesPush (bw : BytesWords) (slot : Fin 2) (cap : Nat) (byte : UInt64) :
+def mBytesPush (bw : BytesWords) (slot : Fin maxHandleSlots) (cap : Nat) (byte : UInt64) :
     BytesWords × UInt64 :=
   if !requireBytesActive bw slot cap then (bw, bytesStateCode)
   else if byte > 255 then (bw, bytesRangeCode)
@@ -268,7 +268,7 @@ def mBytesPush (bw : BytesWords) (slot : Fin 2) (cap : Nat) (byte : UInt64) :
       (setBytesBank bw slot { b with length := b.length + 1 }, okCode)
 
 /-- Append eight LE bytes, or leave the store unchanged when room/range/state fails. -/
-def mBytesAppendLe64 (bw : BytesWords) (slot : Fin 2) (cap : Nat) (value : UInt64) :
+def mBytesAppendLe64 (bw : BytesWords) (slot : Fin maxHandleSlots) (cap : Nat) (value : UInt64) :
     BytesWords × UInt64 :=
   if !requireBytesActive bw slot cap then (bw, bytesStateCode)
   else
@@ -287,19 +287,19 @@ def mBytesAppendLe64 (bw : BytesWords) (slot : Fin 2) (cap : Nat) (value : UInt6
       let bw := write bw 7 (UInt8.ofNat ((value.toNat / 256 ^ 7) % 256))
       (setBytesBank bw slot { b with length := b.length + 8 }, okCode)
 
-theorem mBytesPush_range (bw : BytesWords) (slot : Fin 2) (cap : Nat) (byte : UInt64)
+theorem mBytesPush_range (bw : BytesWords) (slot : Fin maxHandleSlots) (cap : Nat) (byte : UInt64)
     (hact : requireBytesActive bw slot cap = true) (hoob : byte > 255) :
     mBytesPush bw slot cap byte = (bw, bytesRangeCode) := by
   simp [mBytesPush, hact, hoob]
 
-theorem mBytesAppendLe64_no_room (bw : BytesWords) (slot : Fin 2) (cap : Nat)
+theorem mBytesAppendLe64_no_room (bw : BytesWords) (slot : Fin maxHandleSlots) (cap : Nat)
     (value : UInt64)
     (hact : requireBytesActive bw slot cap = true)
     (hfull : (bw.bank slot).length + 8 > cap) :
     mBytesAppendLe64 bw slot cap value = (bw, bytesBoundsCode) := by
   simp [mBytesAppendLe64, hact, hfull]
 
-theorem mBytesAppendLe64_stale (bw : BytesWords) (slot : Fin 2) (cap : Nat)
+theorem mBytesAppendLe64_stale (bw : BytesWords) (slot : Fin maxHandleSlots) (cap : Nat)
     (value : UInt64) (h : requireBytesActive bw slot cap = false) :
     mBytesAppendLe64 bw slot cap value = (bw, bytesStateCode) := by
   simp [mBytesAppendLe64, h]
@@ -323,7 +323,7 @@ theorem invocation_bytes_update_preserves_vec (s : InvocationScratch)
   rfl
 
 /-- A successful vec push composed into the scratch keeps the original bytes banks. -/
-theorem mVec64Push_scratch_preserves_bytes (s : InvocationScratch) (slot : Fin 2)
+theorem mVec64Push_scratch_preserves_bytes (s : InvocationScratch) (slot : Fin maxHandleSlots)
     (cap : Nat) (value : UInt64)
     (_hact : requireActive s.vec slot cap = true)
     (_hroom : (s.vec.bank slot).length < cap) :
@@ -332,7 +332,7 @@ theorem mVec64Push_scratch_preserves_bytes (s : InvocationScratch) (slot : Fin 2
   rfl
 
 /-- A successful bytes push composed into the scratch keeps the original vec banks. -/
-theorem mBytesPush_scratch_preserves_vec (s : InvocationScratch) (slot : Fin 2)
+theorem mBytesPush_scratch_preserves_vec (s : InvocationScratch) (slot : Fin maxHandleSlots)
     (cap : Nat) (byte : UInt64)
     (_hact : requireBytesActive s.bytes slot cap = true)
     (_hin : byte ≤ 255)
@@ -350,7 +350,7 @@ def recordHasRoom (length capacity limbs : Nat) : Bool :=
   decide (length + limbs ≤ capacity)
 
 /-- A 1-limb record append with no room is exactly a full Vector64 push (store unchanged). -/
-theorem mRecordAppend1_rejected_noop (tw : TransientWords) (slot : Fin 2)
+theorem mRecordAppend1_rejected_noop (tw : TransientWords) (slot : Fin maxHandleSlots)
     (cap : Nat) (v0 : UInt64)
     (hact : requireActive tw slot cap = true)
     (hno : recordHasRoom (tw.bank slot).length cap 1 = false) :
@@ -361,7 +361,7 @@ theorem mRecordAppend1_rejected_noop (tw : TransientWords) (slot : Fin 2)
   exact mVec64Push_full tw slot cap v0 hact this
 
 /-- Without room for two limbs, the first word push of a Vector128 is rejected (no partial). -/
-theorem mVec128Push_first_rejected (tw : TransientWords) (slot : Fin 2) (cap : Nat)
+theorem mVec128Push_first_rejected (tw : TransientWords) (slot : Fin maxHandleSlots) (cap : Nat)
     (w0 : UInt64)
     (hact : requireActive tw slot cap = true)
     (_hno : recordHasRoom (tw.bank slot).length cap 2 = false)
