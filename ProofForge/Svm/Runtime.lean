@@ -732,6 +732,24 @@ def token2022TransferCheckedTransferFee (amount : UInt64) (decimals : UInt64) : 
       { acc := 0, signer := true, writable := false }]
     #[.u8le 12, .u64le amount, .u8le decimals]
 
+/--
+Token-2022 `TransferChecked` over a pausable mint. The mint must carry exactly one official
+`Pausable` extension entry (33-byte authority+paused body); source and destination stay on
+the closed base policy. The emitted preflight checks entry admission byte-exactly before
+any persistent write or CPI; the paused flag itself is consulted by the token program over
+the CPI boundary, which owns the on-chain rejection.
+-/
+def token2022TransferCheckedPausable (amount : UInt64) (decimals : UInt64) : UInt64 :=
+  invoke 4
+    #[{ acc := 1, signer := false, writable := true,
+        accountData := some (.token2022Base .account) },
+      { acc := 2, signer := false, writable := false,
+        accountData := some .token2022PausableMint },
+      { acc := 3, signer := false, writable := true,
+        accountData := some (.token2022Base .account) },
+      { acc := 0, signer := true, writable := false }]
+    #[.u8le 12, .u64le amount, .u8le decimals]
+
 
 /--
 Token-2022 `TransferChecked` for the classic-compatible base slice, guarded by the bounded

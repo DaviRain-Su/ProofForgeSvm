@@ -61,6 +61,13 @@ charges the fee over the CPI boundary; this facade only guards admission.
 @[pf_inline] def transferCheckedTransferFee (amount decimals : UInt64) : UInt64 :=
   ProofForge.Svm.Runtime.token2022TransferCheckedTransferFee amount decimals
 
+/--
+Token-2022 `TransferChecked` over a pausable mint: the mint must carry exactly one official
+`Pausable` entry; the token program owns the paused/rejection semantics over the CPI.
+-/
+@[pf_inline] def transferCheckedPausable (amount decimals : UInt64) : UInt64 :=
+  ProofForge.Svm.Runtime.token2022TransferCheckedPausable amount decimals
+
 
 /-- Host-side view of a successfully parsed mint-close authority pubkey (32 raw bytes). -/
 structure MintCloseAuthority where

@@ -261,5 +261,12 @@ def emitPreflight (ctx : Context) (label : String) (physical : Nat) (policy : Po
   ; token-2022 TLV transfer-fee-amount policy for physical account {physical}
 {base}{emitMarkerTlv err next endCheck afterClose (UInt64.toNat transferFeeAmountType) (UInt64.toNat transferFeeAmountBodyLen)}{next}:
 "
+  | .token2022PausableMint =>
+    let endCheck := s!"cpi_data_len_ok_{label}_p{physical}_end"
+    let afterClose := s!"cpi_data_len_ok_{label}_p{physical}_after_close"
+    return s!"\
+  ; token-2022 TLV pausable-mint policy for physical account {physical}
+{base}{emitMarkerTlv err next endCheck afterClose (UInt64.toNat pausableType) (UInt64.toNat pausableBodyLen)}{next}:
+"
 
 end ProofForge.Svm.Cpi.TokenTlv.Emit

@@ -1000,6 +1000,7 @@ private partial def opsCanon (ops : Array Op) : String :=
             | some .token2022NonTransferableMint => "~t22ntmint"
             | some .token2022TransferFeeConfigMint => "~t22tfee"
             | some .token2022TransferFeeAmountAccount => "~t22tfeeamt"
+            | some .token2022PausableMint => "~t22pause"
             | none => ""
           s!"{entry.acc}{if entry.signer then "s" else ""}{if entry.writable then "w" else ""}{dataLen}{policy}"
         let wordCanon (word : Ops.CpiWord Ops.Val) : String :=
