@@ -1,5 +1,5 @@
 import Examples.Svm.Tree
-import ProofForge
+import ProofForge.Svm.Prelude
 
 namespace Tests.TreeSpec
 

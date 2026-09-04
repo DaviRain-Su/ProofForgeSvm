@@ -1,4 +1,4 @@
-import ProofForge
+import ProofForge.Svm.Prelude
 
 namespace Examples.Svm.MemoryOps
 open ProofForge.Svm.Sdk

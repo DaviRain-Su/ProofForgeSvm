@@ -1,5 +1,5 @@
 import Examples.Svm.TicketLine
-import ProofForge
+import ProofForge.Svm.Prelude
 
 /-!
 Focused checks for the `Svm.Sdk.Queue` fixed-capacity FIFO and the `Svm.Sdk.Storage`

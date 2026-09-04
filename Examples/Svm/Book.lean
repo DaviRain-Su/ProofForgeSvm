@@ -1,4 +1,4 @@
-import ProofForge
+import ProofForge.Svm.Prelude
 
 /-!
 固定 4 档 u64 向量。用来钉 SVM 的 `indexGet` / `indexSet` / `forAccum`，

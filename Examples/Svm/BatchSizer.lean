@@ -1,4 +1,4 @@
-import ProofForge
+import ProofForge.Svm.Prelude
 
 /-!
 SVM consumer of shared bounded UInt64 math. Batch sizing owns its zero-capacity error and state

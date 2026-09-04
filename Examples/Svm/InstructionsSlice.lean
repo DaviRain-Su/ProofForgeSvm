@@ -1,4 +1,4 @@
-import ProofForge
+import ProofForge.Svm.Prelude
 
 /-!
 Independent consumer for svm-rt-004: bounded Instructions sysvar + fixed-offset sliced reads.

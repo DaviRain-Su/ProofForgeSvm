@@ -1,6 +1,6 @@
 import Examples.Svm.AccountView
 import Examples.Svm.Trio
-import ProofForge
+import ProofForge.Svm.Prelude
 
 /-!
 Focused SVM SDK account-facade gates. `Examples.Svm.Trio` consumes fixed Account/Signer handles;

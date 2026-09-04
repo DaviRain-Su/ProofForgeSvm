@@ -1,4 +1,4 @@
-import ProofForge
+import ProofForge.Svm.Prelude
 
 namespace Examples.Svm.Token2022SizeVerified
 structure State where

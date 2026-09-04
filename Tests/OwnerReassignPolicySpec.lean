@@ -1,5 +1,5 @@
 import Lean
-import ProofForge
+import ProofForge.Svm.Prelude
 
 /-!
 `svm-sdk-002` permanent fail-closed policy checks.

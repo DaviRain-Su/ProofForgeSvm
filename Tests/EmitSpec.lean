@@ -1,4 +1,4 @@
-import ProofForge
+import ProofForge.Svm.Prelude
 import Examples.Counter
 
 #pf_extract Examples.Counter.init Examples.Counter.increment Examples.Counter.get

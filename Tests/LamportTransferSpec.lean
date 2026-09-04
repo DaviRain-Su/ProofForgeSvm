@@ -1,6 +1,6 @@
 import Examples.Svm.LamportTransfer
 import Lean
-import ProofForge
+import ProofForge.Svm.Prelude
 
 /-!
 Focused checks for the checked SVM lamport-transfer effect via the non-Phoenix

@@ -1,4 +1,4 @@
-import ProofForge
+import ProofForge.Svm.Prelude
 
 /-!
 嵌套 structure。抽出器摊成 `book_price` / `book_size` / `baseFree`。

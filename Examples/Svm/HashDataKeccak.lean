@@ -1,4 +1,4 @@
-import ProofForge
+import ProofForge.Svm.Prelude
 
 namespace Examples.Svm.HashDataKeccak
 open ProofForge.Svm.Runtime

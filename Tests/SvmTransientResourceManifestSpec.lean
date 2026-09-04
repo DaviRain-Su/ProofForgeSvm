@@ -1,5 +1,5 @@
 import Lean
-import ProofForge
+import ProofForge.Svm.Prelude
 import ProofForge.Svm.Sdk.TransientBytes
 import ProofForge.Svm.Sdk.TransientVec
 import ProofForge.Svm.TransientBytes

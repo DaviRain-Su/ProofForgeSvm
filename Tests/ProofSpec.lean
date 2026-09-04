@@ -1,4 +1,4 @@
-import ProofForge
+import ProofForge.Svm.Prelude
 import Examples.Counter
 import Examples.Svm.Tree
 import ProofForge.Svm.Sdk.AssociatedToken

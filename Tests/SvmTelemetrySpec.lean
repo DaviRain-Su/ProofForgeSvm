@@ -1,6 +1,6 @@
 import Examples.Svm.Info
 import Lean
-import ProofForge
+import ProofForge.Svm.Prelude
 
 /-!
 Focused contract and lowering guards for allocation-free SVM invocation telemetry. Runtime tests

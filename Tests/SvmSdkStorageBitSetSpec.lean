@@ -1,6 +1,6 @@
 import Examples.Svm.FeatureBits
 import Examples.Svm.ClaimBits
-import ProofForge
+import ProofForge.Svm.Prelude
 
 /-!
 Focused geometry, packed-word policy, and extraction checks for the SVM persistent bit-set SDK.

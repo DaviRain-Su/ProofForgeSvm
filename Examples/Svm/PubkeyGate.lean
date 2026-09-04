@@ -1,4 +1,4 @@
-import ProofForge
+import ProofForge.Svm.Prelude
 
 /-!
 Independent consumer for the first-class SVM SDK `Pubkey` value. Physical account 0 is

@@ -1,4 +1,4 @@
-import ProofForge
+import ProofForge.Svm.Prelude
 
 /-!
 Sokoban 红黑树节点 + 定长 `Vector`。

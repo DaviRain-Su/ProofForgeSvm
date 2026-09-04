@@ -2,7 +2,7 @@ import Examples.Svm.AccountView
 import Examples.Svm.MemoryOps
 import Examples.Svm.TransientPair
 import Lean
-import ProofForge
+import ProofForge.Svm.Prelude
 
 /-!
 Focused lowering and emitter guards for the source-visible invocation-local byte buffer/writer.

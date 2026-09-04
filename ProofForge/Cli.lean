@@ -204,8 +204,127 @@ private unsafe def extractSvmPrograms (units : Array BuildUnit) :
     IO (Except String (Array Svm.IR.Program)) :=
   try
     Lean.initSearchPath (← Lean.findSysroot)
-    Lean.enableInitializersExecution
+    -- `lake env pf build` exports LEAN_PATH with every workspace package's
+    -- build dir. Lean's import lookup short-circuits on the first entry whose
+    -- module-root *directory* exists (`SearchPath.findWithExt`), so a package
+    -- dir that owns sibling modules shadows a later entry that owns the
+    -- exact module (e.g. `ProofForge/Attr.olean` only in proofforge-common).
+    -- Resolve the transitive import closure ourselves, file-existence first,
+    -- and reduce the search path to the dirs that actually supply modules.
+    let envDirs : Array System.FilePath ← do
+      let mut acc : Array System.FilePath := #[]
+      if let some sp := ← IO.getEnv "LEAN_PATH" then
+        for p in sp.splitOn ":" do
+          if p.isEmpty then continue
+          try acc := acc.push (← IO.FS.realPath p) catch _ => pure ()
+      pure acc
+    let allDirs : List System.FilePath :=
+      (← Lean.searchPathRef.get) ++ envDirs.toList
+    let mut visited : Std.HashSet Lean.Name := {}
+    let mut queue : Array Lean.Name := units.map (·.module)
+    let mut missing : Array Lean.Name := #[]
+    -- Resolved artifacts: module -> (olean, ilean) real paths.
+    let mut artifacts : Array (Lean.Name × System.FilePath × System.FilePath) := #[]
+    repeat
+      if queue.isEmpty then break
+      let mod := queue[0]!
+      queue := queue.drop 1
+      if visited.contains mod then continue
+      visited := visited.insert mod
+      let mut found : Option System.FilePath := none
+      for dir in allDirs do
+        let olean := Lean.modToFilePath dir mod "olean"
+        if ← olean.pathExists then
+          found := some olean
+          break
+      match found with
+      | none => missing := missing.push mod
+      | some olean =>
+        artifacts := artifacts.push (mod, olean, olean.withExtension "ilean")
+        -- Walk the closure via the ilean's `directImports` (present for every
+        let ilean := olean.withExtension "ilean"
+        try
+          let contents ← IO.FS.readFile ilean
+          match Lean.Json.parse contents with
+          | .error _ => pure ()
+          | .ok json =>
+            match json.getObjVal? "directImports" with
+            | .error _ => pure ()
+            | .ok imports =>
+              let entries : Array Lean.Json :=
+                match imports.getArr? with
+                | .ok arr => arr
+                | .error _ => #[]
+              for entry in entries do
+                let first? : Option Lean.Json :=
+                  match entry.getArr? with
+                  | .ok arr => arr[0]?
+                  | .error _ => none
+                match first? with
+                | some (Lean.Json.str name) =>
+                    queue := queue.push (name.toName)
+                | _ => pure ()
+        catch _ => pure ()
+    if missing.isEmpty then
+      -- Lean's import lookup (`SearchPath.findWithExt`) short-circuits on the
+      -- first entry whose module-root *directory* exists, so a package dir
+      -- that owns sibling modules shadows a later entry owning the exact
+      -- module (e.g. `ProofForge/Evm/Emit.olean` only in this repo while
+      -- `ProofForge/` exists in proofforge-common's build dir).
+      -- Materialize a merged view in a private temp dir, but ONLY for the
+      -- shadowed gaps: a module needs a copy iff the first search dir owning
+      -- its root segment (`ProofForge/`, `Examples/`, …) lacks its olean.
+      -- Copying the full closure (incl. the toolchain's Init/Std tree) filled
+      -- CI runners' tmpfs with GBs of duplicates (error 28).
+      let mergeDir : System.FilePath :=
+        ((← IO.getEnv "XDG_RUNTIME_DIR") |>.getD ((← IO.getEnv "TMPDIR") |>.getD "/tmp"))
+          / "pf-lean-path"
+      -- A root segment (e.g. `ProofForge`) is "split" when the closure contains
+      -- modules of that root that the FIRST search dir owning the root does not
+      -- supply. For every split root, copy ALL closure modules of the root into
+      -- the merged view (mergeDir/R itself shadows the owner dirs, so a partial
+      -- copy would fail the remaining lookups). Unsplit roots (Init/Std, and
+      -- `Examples` whose modules all live in this repo) resolve unaided.
+      let mut splitRoots : Std.HashSet String := {}
+      for (mod, _, _) in artifacts do
+        let rootDirName := mod.getRoot.toString
+        let mut naiveDir? : Option System.FilePath := none
+        for dir in allDirs do
+          if ← (dir / rootDirName).pathExists then
+            naiveDir? := some dir
+            break
+        match naiveDir? with
+        | none => pure ()
+        | some naiveDir =>
+            let naiveOlean := Lean.modToFilePath naiveDir mod "olean"
+            if !(← naiveOlean.pathExists) then
+              splitRoots := splitRoots.insert rootDirName
+      let gaps := artifacts.filter fun (mod, _, _) =>
+        splitRoots.contains mod.getRoot.toString
+      -- Stale artifacts from earlier runs (possibly built against a different
+      -- dependency revision) must not mix with the current closure.
+      try IO.FS.removeDirAll mergeDir catch _ => pure ()
+      for (mod, olean, ilean) in gaps do
+        let dst := Lean.modToFilePath mergeDir mod "olean"
+        if !(← dst.parent.get!.pathExists) then
+          IO.FS.createDirAll dst.parent.get!
+        IO.FS.writeBinFile dst (← IO.FS.readBinFile olean)
+        let ileanDst := System.FilePath.withExtension dst "ilean"
+        IO.FS.writeBinFile ileanDst (← IO.FS.readBinFile ilean)
+        -- Opportunistic olean parts (server / private level data) and IR data
+        -- must come along or finalizeImport fails with `missing ... data file`.
+        for part in ["olean.private", "olean.server", "ir"] do
+          let srcPart := System.FilePath.withExtension olean part
+          if ← srcPart.pathExists then
+            IO.FS.writeBinFile (System.FilePath.withExtension dst part)
+              (← IO.FS.readBinFile srcPart)
+      Lean.searchPathRef.set (mergeDir :: allDirs)
+    else
+      -- Closure incomplete: keep the plain LEAN_PATH order and let Lean
+      -- report the original resolution error.
+      Lean.searchPathRef.set allDirs
     let modules := units.map fun u => ({ module := u.module } : Lean.Import)
+    Lean.enableInitializersExecution
     let env ← Lean.importModules modules {} (loadExts := true)
     return units.mapM fun u =>
       match Extract.extractModuleIR env u.module none >>= Svm.IR.fromExtracted with

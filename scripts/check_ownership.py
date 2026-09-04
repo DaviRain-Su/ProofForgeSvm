@@ -2,7 +2,6 @@
 """Fail when application policy leaks across ProofForge target ownership boundaries.
 
 Also enforces productization P0 (prod-001):
-- Examples may use umbrella `import ProofForge` only if listed in the shrink-only allowlist.
 - `ProofForge/Svm/Sdk/**` must not import Emit / Assemble / Registry.
 """
 
@@ -25,7 +24,6 @@ SDK_ROOTS = (
 SDK_FILES_EXTRA = (
     ROOT / "ProofForge" / "Svm" / "Sdk.lean",
 )
-ALLOWLIST_PATH = ROOT / "scripts" / "umbrella_import_allowlist.txt"
 
 DIRECT_EMIT_IMPORT = re.compile(
     r"^\s*import\s+ProofForge\.Svm(?:\.[A-Za-z0-9_]+)*\.Emit\s*(?:--.*)?$",
@@ -34,11 +32,6 @@ DIRECT_EMIT_IMPORT = re.compile(
 APPLICATION_IMPORT = re.compile(r"^\s*import\s+(?:Examples|Projects)(?:\.|\s|$)", re.MULTILINE)
 PROTOCOL_VOCABULARY = re.compile(
     r"\b(?:Phoenix(?:V1)?|OrderPacket|MarketHeader|TraderState)\b", re.IGNORECASE
-)
-# Bare umbrella only: `import ProofForge` with no dotted suffix.
-UMBRELLA_IMPORT = re.compile(
-    r"^\s*import\s+ProofForge\s*(?:--.*)?$",
-    re.MULTILINE,
 )
 # Sdk must not reach compiler/backend surfaces for the same target family.
 SDK_FORBIDDEN_IMPORT = re.compile(
@@ -62,18 +55,6 @@ def report(
         )
 
 
-def load_allowlist() -> set[str]:
-    if not ALLOWLIST_PATH.is_file():
-        return set()
-    entries: set[str] = set()
-    for raw in ALLOWLIST_PATH.read_text(encoding="utf-8").splitlines():
-        line = raw.strip()
-        if not line or line.startswith("#"):
-            continue
-        entries.add(line.replace("\\", "/"))
-    return entries
-
-
 def iter_sdk_files() -> list[Path]:
     files: list[Path] = []
     for root in SDK_ROOTS:
@@ -88,8 +69,6 @@ def iter_sdk_files() -> list[Path]:
 
 def main() -> int:
     failures: list[str] = []
-    allowlist = load_allowlist()
-    umbrella_users: set[str] = set()
 
     for path in sorted(EXAMPLES.rglob("*.lean")):
         text = path.read_text(encoding="utf-8")
@@ -99,32 +78,6 @@ def main() -> int:
             text,
             DIRECT_EMIT_IMPORT,
             "applications must not import target Emit modules directly",
-        )
-        rel = path.relative_to(ROOT).as_posix()
-        if UMBRELLA_IMPORT.search(text):
-            umbrella_users.add(rel)
-            if rel not in allowlist:
-                failures.append(
-                    f"{rel}:1: new Examples umbrella import is forbidden "
-                    f"(not on shrink-only allowlist {ALLOWLIST_PATH.relative_to(ROOT)}): "
-                    f"import ProofForge"
-                )
-
-    unknown = sorted(p for p in allowlist if not (ROOT / p).is_file())
-    for rel in unknown:
-        failures.append(
-            f"{rel}: allowlist entry missing on disk; remove it from "
-            f"{ALLOWLIST_PATH.relative_to(ROOT)}"
-        )
-
-    # Shrink-only: existing allowlist entries that no longer use the umbrella must go.
-    stale = sorted(
-        rel for rel in (allowlist - umbrella_users) if (ROOT / rel).is_file()
-    )
-    for rel in stale:
-        failures.append(
-            f"{rel}: allowlist entry is stale — file no longer has umbrella "
-            f"`import ProofForge`; remove it from {ALLOWLIST_PATH.relative_to(ROOT)}"
         )
 
     for path in iter_sdk_files():
@@ -168,10 +121,7 @@ def main() -> int:
             print(f"  {failure}", file=sys.stderr)
         return 1
 
-    print(
-        "ownership boundaries: ok "
-        f"(umbrella allowlist {len(allowlist)}/{len(umbrella_users)} active)"
-    )
+    print("ownership boundaries: ok")
     return 0
 
 

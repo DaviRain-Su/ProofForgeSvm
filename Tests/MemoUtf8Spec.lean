@@ -1,5 +1,5 @@
 import Examples.Svm.MemoUtf8
-import ProofForge
+import ProofForge.Svm.Prelude
 
 /-!
 Focused geometry and extraction checks for svm-sdk-006 UTF-8 Memo.

@@ -1,6 +1,6 @@
 import Examples.Svm.MemoryOps
 import Lean
-import ProofForge
+import ProofForge.Svm.Prelude
 
 /-!
 Focused contracts for checked SVM account spans and the four official Solana program-memory

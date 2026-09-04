@@ -1,5 +1,5 @@
 import Examples.Svm.JobQueue
-import ProofForge
+import ProofForge.Svm.Prelude
 
 /-!
 Focused checks for the `Svm.Sdk.Storage` persistent facade via the non-Phoenix

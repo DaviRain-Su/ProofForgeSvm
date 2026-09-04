@@ -1,7 +1,7 @@
 import Examples.Svm.TransientLedger
 import Examples.Svm.TransientOrderTape
 import Lean
-import ProofForge
+import ProofForge.Svm.Prelude
 
 /-!
 Focused lowering and emitter guards for the source-visible invocation-local fixed-width POD

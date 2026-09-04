@@ -1,6 +1,6 @@
 import Examples.Svm.VaultRentGrow
 import Lean
-import ProofForge
+import ProofForge.Svm.Prelude
 
 /-!
 Second `svm-sdk-001` consumer: vault grow with explicit funder top-up.

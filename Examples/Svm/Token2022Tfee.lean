@@ -1,4 +1,4 @@
-import ProofForge
+import ProofForge.Svm.Prelude
 
 namespace Examples.Svm.Token2022Tfee
 open ProofForge.Svm.Sdk

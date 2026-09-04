@@ -1,6 +1,6 @@
 import Examples.Svm.AccountViewMutation
 import Lean
-import ProofForge
+import ProofForge.Svm.Prelude
 
 /-!
 Focused checks for `svm-rt-003`: AccountView + lamport mutation share the combined

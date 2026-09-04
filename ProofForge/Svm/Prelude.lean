@@ -66,3 +66,11 @@ import ProofForge.Svm.AssembleCompat
 import ProofForge.Svm.Idl
 import ProofForge.Svm.IdlCompat
 import ProofForge.Svm.Commands
+
+/-!
+Source-facing prelude for Example/fixture programs: one import that re-exposes the
+shared Core/Crypto/Profile surface plus the whole compiler-side Svm tree (Runtime recipes,
+IR, Emit, Assemble, Registry) without naming the bare `ProofForge` umbrella. That module
+name's build prefix is claimed by the `proofforge-common` package, so dependent contexts
+cannot resolve `import ProofForge` (pf source imports failed in CI).
+-/

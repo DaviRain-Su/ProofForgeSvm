@@ -1,6 +1,6 @@
 import Examples.Svm.AccountView
 import Lean
-import ProofForge
+import ProofForge.Svm.Prelude
 
 /-!
 Focused checks for the SVM-RT-1 bounded remaining-account view via the non-Phoenix

@@ -59,14 +59,15 @@ lean_lib ProofForgeSvmSdk where
     `ProofForge.Svm.TransientVec
   ]
 
-/-- Compiler: Extract, Svm IR/Emit/Assemble/Registry, and the `ProofForge` umbrella.
-    The lib is named `ProofForgeSvm` (not `ProofForge`): a lean_lib name claims its
-    namespace for this package and would shadow the `ProofForge.Core.*` /
-    `ProofForge.Crypto.*` modules exported by `proofforge-common`. -/
+/-- Compiler: Extract, Svm IR/Emit/Assemble/Registry, and the `ProofForge.Svm.Prelude`
+    facade. The lib is named `ProofForgeSvm` (not `ProofForge`): a lean_lib name claims
+    its namespace for this package and would shadow the `ProofForge.Core.*` /
+    `ProofForge.Crypto.*` modules exported by `proofforge-common`. The bare
+    `ProofForge` module name is likewise claimed by `proofforge-common`'s build prefix,
+    so source programs import `ProofForge.Svm.Prelude` instead. -/
 @[default_target]
 lean_lib ProofForgeSvm where
   globs := #[
-    .one `ProofForge,
     .one `ProofForge.Cli,
     .one `ProofForge.Svm.Attr,
     .submodules `ProofForge.Svm,

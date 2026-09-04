@@ -2,7 +2,7 @@ import Examples.Svm.Clock
 import Examples.Svm.Epoch
 import Examples.Svm.Rent
 import Lean
-import ProofForge
+import ProofForge.Svm.Prelude
 
 /-!
 Applications consume sysvars through `Svm.Sdk.Sysvar`; extraction routes the target-owned Clock,

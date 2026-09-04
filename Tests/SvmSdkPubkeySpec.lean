@@ -1,6 +1,6 @@
 import Examples.Svm.PubkeyGate
 import Lean
-import ProofForge
+import ProofForge.Svm.Prelude
 
 /-!
 Focused SVM SDK `Pubkey` gates. `Examples.Svm.PubkeyGate` independently consumes the first-class

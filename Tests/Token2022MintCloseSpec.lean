@@ -1,5 +1,5 @@
 import Examples.Svm.Token2022MintClose
-import ProofForge
+import ProofForge.Svm.Prelude
 
 namespace Tests.Token2022MintCloseSpec
 

@@ -1,5 +1,5 @@
 import Examples.Svm.Nested
-import ProofForge
+import ProofForge.Svm.Prelude
 
 namespace Tests.NestedSpec
 

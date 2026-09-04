@@ -1,5 +1,5 @@
 import Examples.Svm.Book
-import ProofForge
+import ProofForge.Svm.Prelude
 
 namespace Tests.BookSpec
 

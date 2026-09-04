@@ -1,7 +1,7 @@
 import Examples.Svm.TransientPubkeyBatch
 import Examples.Svm.TransientPubkeyRing
 import Lean
-import ProofForge
+import ProofForge.Svm.Prelude
 
 /-!
 Focused geometry and extraction checks for svm-sdk-003 typed Pubkey transient vectors.

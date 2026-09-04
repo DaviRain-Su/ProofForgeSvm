@@ -1,7 +1,7 @@
 import Examples.Svm.TransientWide128
 import Examples.Svm.TransientWide256
 import Lean
-import ProofForge
+import ProofForge.Svm.Prelude
 
 /-!
 Focused geometry and extraction proof for typed invocation-local UInt128/UInt256 vectors. Runtime

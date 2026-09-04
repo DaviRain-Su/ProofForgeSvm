@@ -1,4 +1,4 @@
-import ProofForge
+import ProofForge.Svm.Prelude
 import Examples.Svm.Phoenix
 import Examples.Svm.PhoenixV1Profile
 

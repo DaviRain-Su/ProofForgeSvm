@@ -1,6 +1,6 @@
 import Examples.Svm.MemoryOps
 import Lean
-import ProofForge
+import ProofForge.Svm.Prelude
 
 /-!
 Focused contracts for official-shaped SVM account-data resize. The source API exposes only a

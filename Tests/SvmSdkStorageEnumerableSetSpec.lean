@@ -1,6 +1,6 @@
 import Examples.Svm.MemberDirectory
 import Examples.Svm.UniqueRoster
-import ProofForge
+import ProofForge.Svm.Prelude
 
 /-!
 Focused shared policy, derived compact geometry, and extraction checks for the SVM persistent

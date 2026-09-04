@@ -1,5 +1,5 @@
 import Examples.Svm.InstructionsSlice
-import ProofForge
+import ProofForge.Svm.Prelude
 
 /-!
 Geometry and extraction checks for svm-rt-004 bounded Instructions / fixed-offset sliced sysvar.

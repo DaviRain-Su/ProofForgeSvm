@@ -1,7 +1,7 @@
 import Examples.Svm.VersionedLedger
 import Examples.Svm.VersionedMigrator
 import Examples.Svm.VersionedPayloadMigrator
-import ProofForge
+import ProofForge.Svm.Prelude
 
 /-!
 Focused extraction and pure geometry/state checks for the fixed-account version codec. The three

@@ -1,4 +1,4 @@
-import ProofForge
+import ProofForge.Svm.Prelude
 
 namespace Examples.Svm.Transfer
 /-- 无链上状态；init 只占入口形状。 -/

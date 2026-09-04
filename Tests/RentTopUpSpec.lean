@@ -1,6 +1,6 @@
 import Examples.Svm.RentTopUp
 import Lean
-import ProofForge
+import ProofForge.Svm.Prelude
 
 /-!
 Focused checks for `svm-sdk-001` rent top-up composition via `Examples.Svm.RentTopUp`.

@@ -1,5 +1,5 @@
 import Examples.Svm.PhoenixV1Profile
-import ProofForge
+import ProofForge.Svm.Prelude
 
 namespace Tests.PhoenixV1ProfileSpec
 

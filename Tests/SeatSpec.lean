@@ -1,5 +1,5 @@
 import Examples.Svm.Seat
-import ProofForge
+import ProofForge.Svm.Prelude
 
 namespace Tests.SeatSpec
 

@@ -1,5 +1,5 @@
 import Lean
-import ProofForge
+import ProofForge.Svm.Prelude
 import ProofForge.Svm.Sdk.TransientRecord64
 
 /-!

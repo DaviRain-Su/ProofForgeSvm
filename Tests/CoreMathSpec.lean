@@ -1,5 +1,5 @@
 import Examples.Svm.BatchSizer
-import ProofForge
+import ProofForge.Svm.Prelude
 
 /-!
 Host truth tables plus live SVM extraction for the allocation-free bounded, saturating,

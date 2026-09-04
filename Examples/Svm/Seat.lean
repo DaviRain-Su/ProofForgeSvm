@@ -1,4 +1,4 @@
-import ProofForge
+import ProofForge.Svm.Prelude
 
 /-!
 席位 PDA + vault 初始化。不跟 Phoenix 挂单/吃单混：

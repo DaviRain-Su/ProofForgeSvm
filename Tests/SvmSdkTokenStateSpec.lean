@@ -1,4 +1,4 @@
-import ProofForge
+import ProofForge.Svm.Prelude
 import Examples.Svm.TokenStateView
 
 namespace Tests.SvmSdkTokenStateSpec

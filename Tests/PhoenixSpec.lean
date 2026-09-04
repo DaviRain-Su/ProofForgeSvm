@@ -1,5 +1,5 @@
 import Examples.Svm.Phoenix
-import ProofForge
+import ProofForge.Svm.Prelude
 import Std.Data.HashSet
 
 namespace Tests.PhoenixSpec
