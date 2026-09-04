@@ -50,6 +50,22 @@ recent blockhashes, and outer account 3 is the System program. -/
 @[pf_inline] def advanceNonce : UInt64 :=
   ProofForge.Svm.Runtime.systemAdvanceNonce
 
+/-- Initialize external account 1 as a durable-nonce account; authority = outer 0. -/
+@[pf_inline] def initializeNonce : UInt64 :=
+  ProofForge.Svm.Runtime.systemInitializeNonce
+
+/-- Withdraw `lamports` from the nonce account (external 1) into external 2. -/
+@[pf_inline] def withdrawNonce (lamports : UInt64) : UInt64 :=
+  ProofForge.Svm.Runtime.systemWithdrawNonce lamports
+
+/-- Re-authorize the durable nonce account (external 1) to outer 0's key. -/
+@[pf_inline] def authorizeNonce : UInt64 :=
+  ProofForge.Svm.Runtime.systemAuthorizeNonce
+
+/-- Upgrade the legacy delayed-visibility nonce account (external 1) for the program. -/
+@[pf_inline] def upgradeNonce : UInt64 :=
+  ProofForge.Svm.Runtime.systemUpgradeNonce
+
 /-!
 ## Seed-derived accounts
 

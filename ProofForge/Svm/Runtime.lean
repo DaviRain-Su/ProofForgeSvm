@@ -1138,6 +1138,50 @@ def systemAdvanceNonce : UInt64 :=
     #[.u32le 4]
 
 /--
+`system.initializeNonceAccount`：把外部账户 1 初始化为 nonce 账户，授权人为外层签名者
+(outer 0，即 state/authority)。外层：state(0 s) / authority(1 s) / nonce(2 w) /
+recent(3 r) / rent(4 r) / System(5)。CPI 账户序 [nonce, recent, rent] 匹配官方
+InitializeNonceAccount；数据 u32 tag 6 + authorized pubkey(取自外层账户 1 的 key)。
+-/
+def systemInitializeNonce : UInt64 :=
+  invoke 3
+    #[{ acc := 1, signer := false, writable := true },
+      { acc := 2, signer := false, writable := false },
+      { acc := 3, signer := false, writable := false }]
+    #[.u32le 6, .accKey 1]
+
+/--
+`system.withdrawNonceAccount`：从外部账户 1(nonce)提走 lamports 到外部账户 2。
+外层：state(0 s) / nonce(1 w) / dest(2 w) / System(3)。数据：u32 tag 5 + lamports u64。
+-/
+def systemWithdrawNonce (lamports : UInt64) : UInt64 :=
+  invoke 3
+    #[{ acc := 1, signer := false, writable := true },
+      { acc := 2, signer := false, writable := true },
+      { acc := 0, signer := true, writable := false }]
+    #[.u32le 5, .u64le lamports]
+
+/--
+`system.authorizeNonceAccount`：把外部账户 1(nonce)的授权人改成外层签名者。
+外层：state(0 s) / nonce(1 w) / System(2)。数据：u32 tag 7 + authorized(32 字节，取自
+外部账户 0 的 key)。
+-/
+def systemAuthorizeNonce : UInt64 :=
+  invoke 1
+    #[{ acc := 1, signer := false, writable := true }]
+    #[.u32le 7, .accKey 1]
+
+/--
+`system.upgradeNonceAccount`：把外部账户 1 升级为当前 program 拥有的 nonce 账户。
+外层：state(0 s) / nonce(1 w) / System(2)。数据：u32 tag 12。
+-/
+def systemUpgradeNonce : UInt64 :=
+  invoke 2
+    #[{ acc := 1, signer := false, writable := true },
+      { acc := 0, signer := true, writable := false }]
+    #[.u32le 12]
+
+/--
 Token `Revoke`：普通包装。清掉 source 的 delegate。
 外层 0 是 owner。内层：source w / owner s。
 -/

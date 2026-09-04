@@ -108,6 +108,7 @@ import Tests.SvmHaltLogSpec
 import Tests.SvmToken2022PauseSpec
 import Tests.SvmToken2022CpiGuardSpec
 import Tests.SvmToken2022ExtOpenSpec
+import Tests.SvmNonceLifeSpec
 import Tests.SvmHashWordsSpec
 import Tests.ProofSpec
 import Tests.SemanticsSpec
