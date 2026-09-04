@@ -2516,6 +2516,33 @@ private def asAccountDataPolicy (e : Expr) :
     else if isConstNamed p ``ProofForge.Svm.Cpi.TokenTlv.Policy.token2022CpiGuardAccount ||
         endsWith p ".token2022CpiGuardAccount" then
       some (some .token2022CpiGuardAccount)
+    else if isConstNamed p ``ProofForge.Svm.Cpi.TokenTlv.Policy.token2022MemoTransferAccount ||
+        endsWith p ".token2022MemoTransferAccount" then
+      some (some .token2022MemoTransferAccount)
+    else if isConstNamed p ``ProofForge.Svm.Cpi.TokenTlv.Policy.token2022TransferHookAccount ||
+        endsWith p ".token2022TransferHookAccount" then
+      some (some .token2022TransferHookAccount)
+    else if isConstNamed p ``ProofForge.Svm.Cpi.TokenTlv.Policy.token2022TransferHookMint ||
+        endsWith p ".token2022TransferHookMint" then
+      some (some .token2022TransferHookMint)
+    else if isConstNamed p ``ProofForge.Svm.Cpi.TokenTlv.Policy.token2022DefaultAccountStateMint ||
+        endsWith p ".token2022DefaultAccountStateMint" then
+      some (some .token2022DefaultAccountStateMint)
+    else if isConstNamed p ``ProofForge.Svm.Cpi.TokenTlv.Policy.token2022MetadataPointerMint ||
+        endsWith p ".token2022MetadataPointerMint" then
+      some (some .token2022MetadataPointerMint)
+    else if isConstNamed p ``ProofForge.Svm.Cpi.TokenTlv.Policy.token2022GroupPointerMint ||
+        endsWith p ".token2022GroupPointerMint" then
+      some (some .token2022GroupPointerMint)
+    else if isConstNamed p ``ProofForge.Svm.Cpi.TokenTlv.Policy.token2022GroupMemberPointerMint ||
+        endsWith p ".token2022GroupMemberPointerMint" then
+      some (some .token2022GroupMemberPointerMint)
+    else if isConstNamed p ``ProofForge.Svm.Cpi.TokenTlv.Policy.token2022TokenGroupMint ||
+        endsWith p ".token2022TokenGroupMint" then
+      some (some .token2022TokenGroupMint)
+    else if isConstNamed p ``ProofForge.Svm.Cpi.TokenTlv.Policy.token2022TokenGroupMemberMint ||
+        endsWith p ".token2022TokenGroupMemberMint" then
+      some (some .token2022TokenGroupMemberMint)
     else none
   else none
 

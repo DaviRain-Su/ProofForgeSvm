@@ -103,7 +103,61 @@ def nonTransferableType : UInt64 := 9
 /-- Official `ExtensionType::NonTransferableAccount` ordinal (account-side zero-byte marker). -/
 def nonTransferableAccountType : UInt64 := 13
 
-/-- Official `ExtensionType::CpiGuard` ordinal (account-side; 1-byte body). -/
+/-- Official `ExtensionType::MemoTransfer` ordinal (account-side; 1-byte body). -/
+def memoTransferType : UInt64 := 8
+
+/-- Official `MemoTransfer` body length: require_incoming_transfer_memos flag (1). -/
+def memoTransferBodyLen : UInt64 := 1
+
+/-- Official `ExtensionType::DefaultAccountState` ordinal (mint-side; 1-byte body). -/
+def defaultAccountStateType : UInt64 := 6
+
+/-- Official `DefaultAccountState` body length: AccountState u8 (1). -/
+def defaultAccountStateBodyLen : UInt64 := 1
+
+/-- Official `ExtensionType::TransferHook` ordinal (mint-side; 64-byte body). -/
+def transferHookType : UInt64 := 14
+
+/-- Official `TransferHook` body length: authority (32) + program id (32). -/
+def transferHookBodyLen : UInt64 := 64
+
+/-- Official `ExtensionType::TransferHookAccount` ordinal (account-side; 1-byte body). -/
+def transferHookAccountType : UInt64 := 15
+
+/-- Official `TransferHookAccount` body length: transferring flag (1). -/
+def transferHookAccountBodyLen : UInt64 := 1
+
+/-- Official `ExtensionType::MetadataPointer` ordinal (mint-side; 64-byte body). -/
+def metadataPointerType : UInt64 := 18
+
+/-- Official `MetadataPointer` body length: authority (32) + metadata address (32). -/
+def metadataPointerBodyLen : UInt64 := 64
+
+/-- Official `ExtensionType::GroupPointer` ordinal (mint-side; 64-byte body). -/
+def groupPointerType : UInt64 := 20
+
+/-- Official `GroupPointer` body length: authority (32) + group address (32). -/
+def groupPointerBodyLen : UInt64 := 64
+
+/-- Official `ExtensionType::GroupMemberPointer` ordinal (mint-side; 64-byte body). -/
+def groupMemberPointerType : UInt64 := 22
+
+/-- Official `GroupMemberPointer` body length: authority (32) + member address (32). -/
+def groupMemberPointerBodyLen : UInt64 := 64
+
+/-- Official `ExtensionType::TokenGroup` ordinal (mint-side; 80-byte body). -/
+def tokenGroupType : UInt64 := 21
+
+/-- Official `TokenGroup` body length: authority (32) + mint (32) + size (8) + max (8). -/
+def tokenGroupBodyLen : UInt64 := 80
+
+/-- Official `ExtensionType::TokenGroupMember` ordinal (mint-side; 72-byte body). -/
+def tokenGroupMemberType : UInt64 := 23
+
+/-- Official `TokenGroupMember` body length: mint (32) + group (32) + member number (8). -/
+def tokenGroupMemberBodyLen : UInt64 := 72
+
+/-- Official `ExtensionType::Pausable` ordinal (mint-side; 33-byte body). -/
 def cpiGuardType : UInt64 := 11
 
 /-- Official `CpiGuard` body length: lock_cpi flag (1). -/
@@ -243,6 +297,60 @@ inductive Policy where
   CPI boundary; every other extension stays fail closed.
   -/
   | token2022CpiGuardAccount
+  /--
+  Account-only policy accepting exactly one official `MemoTransfer` (ordinal 8, 1-byte
+  flag body) and then an end marker. The require-memo flag is consulted by the token
+  program over the CPI boundary; every other extension stays fail closed.
+  -/
+  | token2022MemoTransferAccount
+  /--
+  Account-only policy accepting exactly one official `TransferHookAccount` (ordinal 15,
+  1-byte transferring flag) and then an end marker. The flag is consulted by the token
+  program over the CPI boundary; every other extension stays fail closed.
+  -/
+  | token2022TransferHookAccount
+  /--
+  Mint-only policy accepting exactly one official `TransferHook` (ordinal 14, 64-byte
+  authority+program body) and then an end marker. Hook CPI emission stays with the
+  token program; every other extension stays fail closed.
+  -/
+  | token2022TransferHookMint
+  /--
+  Mint-only policy accepting exactly one official `DefaultAccountState` (ordinal 6,
+  1-byte state body) and then an end marker. Transfer-neutral; every other extension
+  stays fail closed.
+  -/
+  | token2022DefaultAccountStateMint
+  /--
+  Mint-only policy accepting exactly one official `MetadataPointer` (ordinal 18,
+  64-byte body) and then an end marker. Transfer-neutral; every other extension stays
+  fail closed.
+  -/
+  | token2022MetadataPointerMint
+  /--
+  Mint-only policy accepting exactly one official `GroupPointer` (ordinal 20, 64-byte
+  body) and then an end marker. Transfer-neutral; every other extension stays fail
+  closed.
+  -/
+  | token2022GroupPointerMint
+  /--
+  Mint-only policy accepting exactly one official `GroupMemberPointer` (ordinal 22,
+  64-byte body) and then an end marker. Transfer-neutral; every other extension stays
+  fail closed.
+  -/
+  | token2022GroupMemberPointerMint
+  /--
+  Mint-only policy accepting exactly one official `TokenGroup` (ordinal 21, 80-byte
+  body) and then an end marker. Transfer-neutral; every other extension stays fail
+  closed.
+  -/
+  | token2022TokenGroupMint
+  /--
+  Mint-only policy accepting exactly one official `TokenGroupMember` (ordinal 23,
+  72-byte body) and then an end marker. Transfer-neutral; every other extension stays
+  fail closed.
+  -/
+  | token2022TokenGroupMemberMint
   deriving BEq, DecidableEq, Repr, Inhabited
 
 /-! ## Typed target plan -/
@@ -282,6 +390,15 @@ def planFor : Policy → Except String Plan
   | .token2022TransferFeeAmountAccount => .ok accountPlan
   | .token2022PausableMint => .ok mintPlan
   | .token2022CpiGuardAccount => .ok accountPlan
+  | .token2022MemoTransferAccount => .ok accountPlan
+  | .token2022TransferHookAccount => .ok accountPlan
+  | .token2022TransferHookMint => .ok mintPlan
+  | .token2022DefaultAccountStateMint => .ok mintPlan
+  | .token2022MetadataPointerMint => .ok mintPlan
+  | .token2022GroupPointerMint => .ok mintPlan
+  | .token2022GroupMemberPointerMint => .ok mintPlan
+  | .token2022TokenGroupMint => .ok mintPlan
+  | .token2022TokenGroupMemberMint => .ok mintPlan
 
 def Plan.wellFormed (plan : Plan) : Bool :=
   plan.baseLen + plan.paddingBytes + 1 == tlvStart &&
@@ -467,6 +584,42 @@ def pausableMintAccept? (t : UInt64) : Bool :=
 def cpiGuardAccountAccept? (t : UInt64) : Bool :=
   t == cpiGuardType
 
+/-- Accept only official `MemoTransfer` (ordinal 8). -/
+def memoTransferAccountAccept? (t : UInt64) : Bool :=
+  t == memoTransferType
+
+/-- Accept only official `TransferHookAccount` (ordinal 15). -/
+def transferHookAccountAccept? (t : UInt64) : Bool :=
+  t == transferHookAccountType
+
+/-- Accept only official `TransferHook` (ordinal 14). -/
+def transferHookMintAccept? (t : UInt64) : Bool :=
+  t == transferHookType
+
+/-- Accept only official `DefaultAccountState` (ordinal 6). -/
+def defaultAccountStateMintAccept? (t : UInt64) : Bool :=
+  t == defaultAccountStateType
+
+/-- Accept only official `MetadataPointer` (ordinal 18). -/
+def metadataPointerMintAccept? (t : UInt64) : Bool :=
+  t == metadataPointerType
+
+/-- Accept only official `GroupPointer` (ordinal 20). -/
+def groupPointerMintAccept? (t : UInt64) : Bool :=
+  t == groupPointerType
+
+/-- Accept only official `GroupMemberPointer` (ordinal 22). -/
+def groupMemberPointerMintAccept? (t : UInt64) : Bool :=
+  t == groupMemberPointerType
+
+/-- Accept only official `TokenGroup` (ordinal 21). -/
+def tokenGroupMintAccept? (t : UInt64) : Bool :=
+  t == tokenGroupType
+
+/-- Accept only official `TokenGroupMember` (ordinal 23). -/
+def tokenGroupMemberMintAccept? (t : UInt64) : Bool :=
+  t == tokenGroupMemberType
+
 
 /-- Classifier selected by the closed policy vocabulary. -/
 def acceptFor : Policy → (UInt64 → Bool)
@@ -479,6 +632,15 @@ def acceptFor : Policy → (UInt64 → Bool)
   | .token2022TransferFeeAmountAccount => transferFeeAmountAccountAccept?
   | .token2022PausableMint => pausableMintAccept?
   | .token2022CpiGuardAccount => cpiGuardAccountAccept?
+  | .token2022MemoTransferAccount => memoTransferAccountAccept?
+  | .token2022TransferHookAccount => transferHookAccountAccept?
+  | .token2022TransferHookMint => transferHookMintAccept?
+  | .token2022DefaultAccountStateMint => defaultAccountStateMintAccept?
+  | .token2022MetadataPointerMint => metadataPointerMintAccept?
+  | .token2022GroupPointerMint => groupPointerMintAccept?
+  | .token2022GroupMemberPointerMint => groupMemberPointerMintAccept?
+  | .token2022TokenGroupMint => tokenGroupMintAccept?
+  | .token2022TokenGroupMemberMint => tokenGroupMemberMintAccept?
 /-- Fixed official body length required when a policy accepts a type; `none` means reject. -/
 def requiredBodyLen? : Policy → UInt64 → Option UInt64
   | .token2022MintClose, t =>
@@ -497,6 +659,24 @@ def requiredBodyLen? : Policy → UInt64 → Option UInt64
       if t == pausableType then some pausableBodyLen else none
   | .token2022CpiGuardAccount, t =>
       if t == cpiGuardType then some cpiGuardBodyLen else none
+  | .token2022MemoTransferAccount, t =>
+      if t == memoTransferType then some memoTransferBodyLen else none
+  | .token2022TransferHookAccount, t =>
+      if t == transferHookAccountType then some transferHookAccountBodyLen else none
+  | .token2022TransferHookMint, t =>
+      if t == transferHookType then some transferHookBodyLen else none
+  | .token2022DefaultAccountStateMint, t =>
+      if t == defaultAccountStateType then some defaultAccountStateBodyLen else none
+  | .token2022MetadataPointerMint, t =>
+      if t == metadataPointerType then some metadataPointerBodyLen else none
+  | .token2022GroupPointerMint, t =>
+      if t == groupPointerType then some groupPointerBodyLen else none
+  | .token2022GroupMemberPointerMint, t =>
+      if t == groupMemberPointerType then some groupMemberPointerBodyLen else none
+  | .token2022TokenGroupMint, t =>
+      if t == tokenGroupType then some tokenGroupBodyLen else none
+  | .token2022TokenGroupMemberMint, t =>
+      if t == tokenGroupMemberType then some tokenGroupMemberBodyLen else none
   | .token2022Base _, _ => none
 
 /--
@@ -587,6 +767,15 @@ theorem planFor_yields_wellFormed : ∀ p, ∃ plan, planFor p = .ok plan ∧ pl
   | token2022TransferFeeAmountAccount => exact ⟨accountPlan, rfl, accountPlan_wellFormed⟩
   | token2022PausableMint => exact ⟨mintPlan, rfl, mintPlan_wellFormed⟩
   | token2022CpiGuardAccount => exact ⟨accountPlan, rfl, accountPlan_wellFormed⟩
+  | token2022MemoTransferAccount => exact ⟨accountPlan, rfl, accountPlan_wellFormed⟩
+  | token2022TransferHookAccount => exact ⟨accountPlan, rfl, accountPlan_wellFormed⟩
+  | token2022TransferHookMint => exact ⟨mintPlan, rfl, mintPlan_wellFormed⟩
+  | token2022DefaultAccountStateMint => exact ⟨mintPlan, rfl, mintPlan_wellFormed⟩
+  | token2022MetadataPointerMint => exact ⟨mintPlan, rfl, mintPlan_wellFormed⟩
+  | token2022GroupPointerMint => exact ⟨mintPlan, rfl, mintPlan_wellFormed⟩
+  | token2022GroupMemberPointerMint => exact ⟨mintPlan, rfl, mintPlan_wellFormed⟩
+  | token2022TokenGroupMint => exact ⟨mintPlan, rfl, mintPlan_wellFormed⟩
+  | token2022TokenGroupMemberMint => exact ⟨mintPlan, rfl, mintPlan_wellFormed⟩
 /-- The classifier partitions every ordinal into the three official shapes. -/
 theorem classify_total (t : UInt64) :
     classify t = .endMarker ∨ (∃ t', classify t = .known t') ∨ (∃ t', classify t = .unknown t') := by

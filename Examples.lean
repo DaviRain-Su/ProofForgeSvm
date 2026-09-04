@@ -88,6 +88,7 @@ import Examples.Svm.Token2022Tfee
 import Examples.Svm.HaltLog
 import Examples.Svm.Token2022Pause
 import Examples.Svm.Token2022CpiGuard
+import Examples.Svm.Token2022ExtOpen
 import Examples.Svm.TransientPubkeyBatch
 import Examples.Svm.TransientPubkeyRing
 import Examples.Svm.HashWords

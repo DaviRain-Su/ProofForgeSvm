@@ -275,5 +275,68 @@ def emitPreflight (ctx : Context) (label : String) (physical : Nat) (policy : Po
   ; token-2022 TLV cpi-guard policy for physical account {physical}
 {base}{emitMarkerTlv err next endCheck afterClose (UInt64.toNat cpiGuardType) (UInt64.toNat cpiGuardBodyLen)}{next}:
 "
+  | .token2022MemoTransferAccount =>
+    let endCheck := s!"cpi_data_len_ok_{label}_p{physical}_end"
+    let afterClose := s!"cpi_data_len_ok_{label}_p{physical}_after_close"
+    return s!"\
+  ; token-2022 TLV memo-transfer policy for physical account {physical}
+{base}{emitMarkerTlv err next endCheck afterClose (UInt64.toNat memoTransferType) (UInt64.toNat memoTransferBodyLen)}{next}:
+"
+  | .token2022TransferHookAccount =>
+    let endCheck := s!"cpi_data_len_ok_{label}_p{physical}_end"
+    let afterClose := s!"cpi_data_len_ok_{label}_p{physical}_after_close"
+    return s!"\
+  ; token-2022 TLV transfer-hook-account policy for physical account {physical}
+{base}{emitMarkerTlv err next endCheck afterClose (UInt64.toNat transferHookAccountType) (UInt64.toNat transferHookAccountBodyLen)}{next}:
+"
+  | .token2022TransferHookMint =>
+    let endCheck := s!"cpi_data_len_ok_{label}_p{physical}_end"
+    let afterClose := s!"cpi_data_len_ok_{label}_p{physical}_after_close"
+    return s!"\
+  ; token-2022 TLV transfer-hook-mint policy for physical account {physical}
+{base}{emitMarkerTlv err next endCheck afterClose (UInt64.toNat transferHookType) (UInt64.toNat transferHookBodyLen)}{next}:
+"
+  | .token2022DefaultAccountStateMint =>
+    let endCheck := s!"cpi_data_len_ok_{label}_p{physical}_end"
+    let afterClose := s!"cpi_data_len_ok_{label}_p{physical}_after_close"
+    return s!"\
+  ; token-2022 TLV default-account-state policy for physical account {physical}
+{base}{emitMarkerTlv err next endCheck afterClose (UInt64.toNat defaultAccountStateType) (UInt64.toNat defaultAccountStateBodyLen)}{next}:
+"
+  | .token2022MetadataPointerMint =>
+    let endCheck := s!"cpi_data_len_ok_{label}_p{physical}_end"
+    let afterClose := s!"cpi_data_len_ok_{label}_p{physical}_after_close"
+    return s!"\
+  ; token-2022 TLV metadata-pointer policy for physical account {physical}
+{base}{emitMarkerTlv err next endCheck afterClose (UInt64.toNat metadataPointerType) (UInt64.toNat metadataPointerBodyLen)}{next}:
+"
+  | .token2022GroupPointerMint =>
+    let endCheck := s!"cpi_data_len_ok_{label}_p{physical}_end"
+    let afterClose := s!"cpi_data_len_ok_{label}_p{physical}_after_close"
+    return s!"\
+  ; token-2022 TLV group-pointer policy for physical account {physical}
+{base}{emitMarkerTlv err next endCheck afterClose (UInt64.toNat groupPointerType) (UInt64.toNat groupPointerBodyLen)}{next}:
+"
+  | .token2022GroupMemberPointerMint =>
+    let endCheck := s!"cpi_data_len_ok_{label}_p{physical}_end"
+    let afterClose := s!"cpi_data_len_ok_{label}_p{physical}_after_close"
+    return s!"\
+  ; token-2022 TLV group-member-pointer policy for physical account {physical}
+{base}{emitMarkerTlv err next endCheck afterClose (UInt64.toNat groupMemberPointerType) (UInt64.toNat groupMemberPointerBodyLen)}{next}:
+"
+  | .token2022TokenGroupMint =>
+    let endCheck := s!"cpi_data_len_ok_{label}_p{physical}_end"
+    let afterClose := s!"cpi_data_len_ok_{label}_p{physical}_after_close"
+    return s!"\
+  ; token-2022 TLV token-group policy for physical account {physical}
+{base}{emitMarkerTlv err next endCheck afterClose (UInt64.toNat tokenGroupType) (UInt64.toNat tokenGroupBodyLen)}{next}:
+"
+  | .token2022TokenGroupMemberMint =>
+    let endCheck := s!"cpi_data_len_ok_{label}_p{physical}_end"
+    let afterClose := s!"cpi_data_len_ok_{label}_p{physical}_after_close"
+    return s!"\
+  ; token-2022 TLV token-group-member policy for physical account {physical}
+{base}{emitMarkerTlv err next endCheck afterClose (UInt64.toNat tokenGroupMemberType) (UInt64.toNat tokenGroupMemberBodyLen)}{next}:
+"
 
 end ProofForge.Svm.Cpi.TokenTlv.Emit

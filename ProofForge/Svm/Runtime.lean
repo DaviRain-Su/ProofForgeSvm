@@ -748,6 +748,132 @@ def token2022TransferCheckedCpiGuard (amount : UInt64) (decimals : UInt64) : UIn
       { acc := 0, signer := true, writable := false }]
     #[.u8le 12, .u64le amount, .u8le decimals]
 
+/--
+Token-2022 `TransferChecked` whose destination account carries exactly one official
+`MemoTransfer` extension entry (1-byte require-memo flag). Admission-only: the flag is
+consulted by the token program over the CPI boundary, which owns the official
+`NoMemo` rejection when a required memo is missing.
+-/
+def token2022TransferCheckedMemoTransfer (amount : UInt64) (decimals : UInt64) : UInt64 :=
+  invoke 4
+    #[{ acc := 1, signer := false, writable := true,
+        accountData := some (.token2022Base .account) },
+      { acc := 2, signer := false, writable := false,
+        accountData := some (.token2022Base .mint) },
+      { acc := 3, signer := false, writable := true,
+        accountData := some .token2022MemoTransferAccount },
+      { acc := 0, signer := true, writable := false }]
+    #[.u8le 12, .u64le amount, .u8le decimals]
+
+/--
+Token-2022 `TransferChecked` over a mint carrying exactly one official `TransferHook`
+extension entry (64-byte authority+program body); the destination carries exactly one
+official `TransferHookAccount` entry (1-byte transferring flag). Admission-only: hook
+CPI emission and the transferring flag discipline stay with the token program over the
+CPI boundary.
+-/
+def token2022TransferCheckedTransferHook (amount : UInt64) (decimals : UInt64) : UInt64 :=
+  invoke 4
+    #[{ acc := 1, signer := false, writable := true,
+        accountData := some (.token2022Base .account) },
+      { acc := 2, signer := false, writable := false,
+        accountData := some .token2022TransferHookMint },
+      { acc := 3, signer := false, writable := true,
+        accountData := some .token2022TransferHookAccount },
+      { acc := 0, signer := true, writable := false }]
+    #[.u8le 12, .u64le amount, .u8le decimals]
+
+/--
+Token-2022 `TransferChecked` over a mint carrying exactly one official
+`DefaultAccountState` entry (1-byte state body). Transfer-neutral admission: the
+default state is applied at account initialization by the token program.
+-/
+def token2022TransferCheckedDefaultAccountState (amount : UInt64) (decimals : UInt64) : UInt64 :=
+  invoke 4
+    #[{ acc := 1, signer := false, writable := true,
+        accountData := some (.token2022Base .account) },
+      { acc := 2, signer := false, writable := false,
+        accountData := some .token2022DefaultAccountStateMint },
+      { acc := 3, signer := false, writable := true,
+        accountData := some (.token2022Base .account) },
+      { acc := 0, signer := true, writable := false }]
+    #[.u8le 12, .u64le amount, .u8le decimals]
+
+/--
+Token-2022 `TransferChecked` over a mint carrying exactly one official `MetadataPointer`
+entry (64-byte body). Transfer-neutral admission.
+-/
+def token2022TransferCheckedMetadataPointer (amount : UInt64) (decimals : UInt64) : UInt64 :=
+  invoke 4
+    #[{ acc := 1, signer := false, writable := true,
+        accountData := some (.token2022Base .account) },
+      { acc := 2, signer := false, writable := false,
+        accountData := some .token2022MetadataPointerMint },
+      { acc := 3, signer := false, writable := true,
+        accountData := some (.token2022Base .account) },
+      { acc := 0, signer := true, writable := false }]
+    #[.u8le 12, .u64le amount, .u8le decimals]
+
+/--
+Token-2022 `TransferChecked` over a mint carrying exactly one official `GroupPointer`
+entry (64-byte body). Transfer-neutral admission.
+-/
+def token2022TransferCheckedGroupPointer (amount : UInt64) (decimals : UInt64) : UInt64 :=
+  invoke 4
+    #[{ acc := 1, signer := false, writable := true,
+        accountData := some (.token2022Base .account) },
+      { acc := 2, signer := false, writable := false,
+        accountData := some .token2022GroupPointerMint },
+      { acc := 3, signer := false, writable := true,
+        accountData := some (.token2022Base .account) },
+      { acc := 0, signer := true, writable := false }]
+    #[.u8le 12, .u64le amount, .u8le decimals]
+
+/--
+Token-2022 `TransferChecked` over a mint carrying exactly one official
+`GroupMemberPointer` entry (64-byte body). Transfer-neutral admission.
+-/
+def token2022TransferCheckedGroupMemberPointer (amount : UInt64) (decimals : UInt64) : UInt64 :=
+  invoke 4
+    #[{ acc := 1, signer := false, writable := true,
+        accountData := some (.token2022Base .account) },
+      { acc := 2, signer := false, writable := false,
+        accountData := some .token2022GroupMemberPointerMint },
+      { acc := 3, signer := false, writable := true,
+        accountData := some (.token2022Base .account) },
+      { acc := 0, signer := true, writable := false }]
+    #[.u8le 12, .u64le amount, .u8le decimals]
+
+/--
+Token-2022 `TransferChecked` over a mint carrying exactly one official `TokenGroup`
+entry (80-byte body). Transfer-neutral admission.
+-/
+def token2022TransferCheckedTokenGroup (amount : UInt64) (decimals : UInt64) : UInt64 :=
+  invoke 4
+    #[{ acc := 1, signer := false, writable := true,
+        accountData := some (.token2022Base .account) },
+      { acc := 2, signer := false, writable := false,
+        accountData := some .token2022TokenGroupMint },
+      { acc := 3, signer := false, writable := true,
+        accountData := some (.token2022Base .account) },
+      { acc := 0, signer := true, writable := false }]
+    #[.u8le 12, .u64le amount, .u8le decimals]
+
+/--
+Token-2022 `TransferChecked` over a mint carrying exactly one official
+`TokenGroupMember` entry (72-byte body). Transfer-neutral admission.
+-/
+def token2022TransferCheckedTokenGroupMember (amount : UInt64) (decimals : UInt64) : UInt64 :=
+  invoke 4
+    #[{ acc := 1, signer := false, writable := true,
+        accountData := some (.token2022Base .account) },
+      { acc := 2, signer := false, writable := false,
+        accountData := some .token2022TokenGroupMemberMint },
+      { acc := 3, signer := false, writable := true,
+        accountData := some (.token2022Base .account) },
+      { acc := 0, signer := true, writable := false }]
+    #[.u8le 12, .u64le amount, .u8le decimals]
+
 
 /--
 Token-2022 `TransferChecked` for the classic-compatible base slice, guarded by the bounded

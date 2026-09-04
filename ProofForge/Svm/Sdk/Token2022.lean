@@ -117,6 +117,39 @@ owner-signed in-CPI transfers.
 @[pf_inline] def transferCheckedCpiGuard (amount decimals : UInt64) : UInt64 :=
   ProofForge.Svm.Runtime.token2022TransferCheckedCpiGuard amount decimals
 
+/-- Token-2022 TransferChecked with a `MemoTransfer`-flagged destination (admission only). -/
+@[pf_inline] def transferCheckedMemoTransfer (amount decimals : UInt64) : UInt64 :=
+  ProofForge.Svm.Runtime.token2022TransferCheckedMemoTransfer amount decimals
+
+/-- Token-2022 TransferChecked with a `TransferHook` mint and `TransferHookAccount`
+destination (admission only; hook CPI stays with the token program). -/
+@[pf_inline] def transferCheckedTransferHook (amount decimals : UInt64) : UInt64 :=
+  ProofForge.Svm.Runtime.token2022TransferCheckedTransferHook amount decimals
+
+/-- Token-2022 TransferChecked with a `DefaultAccountState` mint (transfer-neutral). -/
+@[pf_inline] def transferCheckedDefaultAccountState (amount decimals : UInt64) : UInt64 :=
+  ProofForge.Svm.Runtime.token2022TransferCheckedDefaultAccountState amount decimals
+
+/-- Token-2022 TransferChecked with a `MetadataPointer` mint (transfer-neutral). -/
+@[pf_inline] def transferCheckedMetadataPointer (amount decimals : UInt64) : UInt64 :=
+  ProofForge.Svm.Runtime.token2022TransferCheckedMetadataPointer amount decimals
+
+/-- Token-2022 TransferChecked with a `GroupPointer` mint (transfer-neutral). -/
+@[pf_inline] def transferCheckedGroupPointer (amount decimals : UInt64) : UInt64 :=
+  ProofForge.Svm.Runtime.token2022TransferCheckedGroupPointer amount decimals
+
+/-- Token-2022 TransferChecked with a `GroupMemberPointer` mint (transfer-neutral). -/
+@[pf_inline] def transferCheckedGroupMemberPointer (amount decimals : UInt64) : UInt64 :=
+  ProofForge.Svm.Runtime.token2022TransferCheckedGroupMemberPointer amount decimals
+
+/-- Token-2022 TransferChecked with a `TokenGroup` mint (transfer-neutral). -/
+@[pf_inline] def transferCheckedTokenGroup (amount decimals : UInt64) : UInt64 :=
+  ProofForge.Svm.Runtime.token2022TransferCheckedTokenGroup amount decimals
+
+/-- Token-2022 TransferChecked with a `TokenGroupMember` mint (transfer-neutral). -/
+@[pf_inline] def transferCheckedTokenGroupMember (amount decimals : UInt64) : UInt64 :=
+  ProofForge.Svm.Runtime.token2022TransferCheckedTokenGroupMember amount decimals
+
 
 /-- Host-side view of a successfully parsed mint-close authority pubkey (32 raw bytes). -/
 structure MintCloseAuthority where
